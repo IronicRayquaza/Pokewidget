@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every view here is on the RemoteViews allow-list. ConstraintLayout, custom views and
+  property animators are not available in a widget.
+
+  The ViewFlipper deliberately declares no android:inAnimation / android:outAnimation:
+  ViewAnimator's defaults are null, and any transition would cross-fade the frames of
+  what is meant to be a crisp frame-by-frame sprite animation.
+
+  android:autoStart must be declared here, not pushed at runtime: setFlipInterval(int)
+  is a @RemotableViewMethod but setAutoStart(boolean) is not, and calling it through
+  RemoteViews throws ActionException ("ViewFlipper can't use method with RemoteViews").
+  Declared in the layout it works everywhere, and the flipper starts as soon as the
+  launcher attaches it to a window — and stops again when it scrolls off screen.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_background"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:visibility="gone" />
+
+    <ViewFlipper
+        android:id="@+id/widget_flipper"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:autoStart="true"
+        android:flipInterval="100"
+        android:measureAllChildren="false" />
+
+    <TextView
+        android:id="@+id/widget_status"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:padding="8dp"
+        android:textColor="#FFFFFFFF"
+        android:textSize="11sp"
+        android:shadowColor="#B0000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="3"
+        android:visibility="gone" />
+
+</FrameLayout>

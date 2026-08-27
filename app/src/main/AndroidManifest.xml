@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:name=".PokeWidgetApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PokeWidget">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.PokeWidget">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Launched by the launcher when a widget is dropped, and again from inside the
+          app to edit one. Must return RESULT_OK with EXTRA_APPWIDGET_ID or the launcher
+          silently discards the widget the user just placed.
+        -->
+        <activity
+            android:name=".ui.WidgetConfigActivity"
+            android:exported="true"
+            android:label="@string/configure_widget"
+            android:theme="@style/Theme.PokeWidget">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Three sizes so the widget picker offers presets. All are freely resizable
+          afterwards; onAppWidgetOptionsChanged re-plans the sprite for the new box.
+        -->
+        <receiver
+            android:name=".widget.PokemonWidgetProvider$Small"
+            android:exported="true"
+            android:label="@string/widget_small">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.pokewidgets.app.ACTION_TAP" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_small" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PokemonWidgetProvider$Medium"
+            android:exported="true"
+            android:label="@string/widget_medium">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.pokewidgets.app.ACTION_TAP" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_medium" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PokemonWidgetProvider$Large"
+            android:exported="true"
+            android:label="@string/widget_large">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.pokewidgets.app.ACTION_TAP" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_large" />
+        </receiver>
+
+    </application>
+
+</manifest>

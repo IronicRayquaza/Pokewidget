@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PokéWidget</string>
+    <string name="configure_widget">Set up widget</string>
+
+    <string name="widget_small">Pokémon sprite (small)</string>
+    <string name="widget_medium">Pokémon sprite (medium)</string>
+    <string name="widget_large">Pokémon sprite (large)</string>
+    <string name="widget_loading">Loading sprite</string>
+</resources>

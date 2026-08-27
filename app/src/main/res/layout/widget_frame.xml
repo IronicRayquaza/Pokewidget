@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One animation frame, added to the ViewFlipper at runtime via RemoteViews.addView.
+
+  scaleType is "center", not "fitCenter": the bitmap has already been upscaled by an
+  exact integer factor with nearest-neighbour sampling, so any further scaling by the
+  ImageView would reintroduce the bilinear blur we went to the trouble of avoiding.
+-->
+<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_frame_image"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:contentDescription="@null"
+    android:scaleType="center" />

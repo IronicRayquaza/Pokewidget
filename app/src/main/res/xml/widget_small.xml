@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  updatePeriodMillis is 0 on purpose. The animation runs inside the launcher's own
+  ViewFlipper, so the widget never needs a scheduled wake-up: we push frames once when
+  something actually changes, and the launcher handles the rest for free.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="com.pokewidgets.app.ui.WidgetConfigActivity"
+    android:initialLayout="@layout/widget_initial"
+    android:minHeight="40dp"
+    android:minResizeHeight="40dp"
+    android:minResizeWidth="40dp"
+    android:minWidth="40dp"
+    android:previewImage="@drawable/widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellHeight="1"
+    android:targetCellWidth="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

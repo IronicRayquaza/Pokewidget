@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The layout the launcher inflates before our first render arrives.
+
+  Deliberately NOT widget_root: that layout's ViewFlipper has android:autoStart, and an
+  auto-starting flipper with zero children re-posts showNext() every flipInterval inside
+  the launcher's process, burning CPU for a widget that isn't showing anything yet.
+  A widget must cost nothing while it waits.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center"
+        android:alpha="0.55"
+        android:contentDescription="@string/widget_loading"
+        android:src="@drawable/ic_launcher_foreground" />
+
+</FrameLayout>

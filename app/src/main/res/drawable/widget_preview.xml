@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shown in the launcher's widget picker before a sprite has been chosen. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#1B1F27" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+    <item
+        android:bottom="18dp"
+        android:left="18dp"
+        android:right="18dp"
+        android:top="18dp"
+        android:drawable="@drawable/ic_launcher_foreground" />
+</layer-list>
