@@ -1,6 +1,8 @@
 package com.pokewidgets.app.data
 
 import com.pokewidgets.app.catalog.SpriteKey
+import com.pokewidgets.app.sprite.IdleAnimator
+import com.pokewidgets.app.sprite.IdleStyle
 
 /** What a tap on the widget does. */
 enum class TapAction(val label: String, val description: String) {
@@ -50,6 +52,13 @@ data class WidgetConfig(
     val smoothness: Smoothness = Smoothness.BALANCED,
     val fill: Fill = Fill.FIT,
     val tapAction: TapAction = TapAction.CRY,
+
+    /**
+     * How a *still* sprite moves. Ignored by sets that ship real animation, and the only
+     * thing that gives Emerald, FireRed/LeafGreen, Platinum, HeartGold/SoulSilver and
+     * everything from Gen 6 on any movement at all — see [IdleAnimator].
+     */
+    val idleStyle: IdleStyle = IdleAnimator.DEFAULT,
 
     /** Set while an "excited" tap burst is running, so the renderer speeds the flip up. */
     val excitedUntilMs: Long = 0L,

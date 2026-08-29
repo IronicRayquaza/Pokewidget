@@ -90,30 +90,43 @@ The renderer still wraps `updateAppWidget` in a `try/catch` that re-plans agains
 budget. The planner should never overshoot — but a launcher crash is not a thing to bet
 someone's home screen on.
 
-### Static sprites get an idle bob
+### Still sprites get a generated idle
 
-Every Game Boy Advance set, all of Gen 4, and everything from Gen 6 on exists only as
-still PNGs. Emerald's real in-game animation lives inside ROM rips, not in any
-distributable mirror. Rather than sit dead on the home screen, those get the gentle
-vertical bob the games use in menus — and it is free: the same bitmap goes into every
-frame, with only `setViewPadding` differing.
+Ruby/Sapphire, FireRed/LeafGreen and everything from Gen 6 on exist only as still PNGs.
+Rather than sit dead on the home screen they get a generated idle — breathe, bob, sway or
+hover, chosen per widget in `IdleAnimator`.
+
+It is nearly free, because the cost is one bitmap per distinct *shape*, not per step:
+translation is expressed as `setViewPadding` and `RemoteViews.BitmapCache` dedupes by
+object identity, so a ten-step sway is one bitmap and a six-step breath is three. The
+breath conserves volume — what the sprite loses in height it gains in width — and is
+anchored at its feet, so it reads as weight rather than as the creature shrinking.
 
 ---
 
 ## Sprites
 
-Everything is pinned to one commit of [`PokeAPI/sprites`][sprites], so a cached file can
-never go stale and jsDelivr can cache it forever. **27 sprite sets, 1,345 Pokémon and
-alternate forms.** Three sets are genuinely animated:
+Sprite art is immutable, so everything is cached forever: [`PokeAPI/sprites`][sprites] is
+pinned to one commit, and veekun's dump is a finished archive of shipped games.
+**31 sprite sets, 1,345 Pokémon and alternate forms.** Seven are genuinely animated:
 
-| Set | Hardware | Coverage |
-|---|---|---|
-| **Showdown** | Fan-made, Gen 5 style | 1,283 sprites — every Pokémon through Gen 9 |
-| **Black / White** | Nintendo DS | 872 — the original in-game animated battle sprites |
-| **Crystal** | Game Boy Color | 250 — the first animated sprites in the series |
+| Set | Hardware | Source | Coverage |
+|---|---|---|---|
+| **Showdown** | Fan-made, Gen 5 style | PokeAPI | 1,283 sprites — every Pokémon through Gen 9 |
+| **Black / White** | Nintendo DS | PokeAPI | 872 — the original in-game battle sprites |
+| **Emerald** | Game Boy Advance | veekun | 385 + shiny — the real Gen 3 battle animation |
+| **Diamond / Pearl** | Nintendo DS | veekun | 493 — the two-frame in-game idle |
+| **Platinum** | Nintendo DS | veekun | 493 — the two-frame in-game idle |
+| **HeartGold / SoulSilver** | Nintendo DS | veekun | 493 — the two-frame in-game idle |
+| **Crystal** | Game Boy Color | PokeAPI | 250 — the first animated sprites in the series |
 
-The other 24 cover Red/Blue through Scarlet/Violet, box icons, HOME renders and official
-artwork, all with the idle bob.
+PokeAPI has no copy of the animation for Gen 3 and Gen 4, which is why a second provider
+exists. veekun hosts Emerald's real battle sequences as GIFs, and stores the second frame
+of each Gen 4 idle in a parallel `frame2/` tree — so those three games are reassembled
+from two PNGs each at render time (`SpriteSet.frameDirs`).
+
+The remaining 24 sets cover Red/Blue through Scarlet/Violet, box icons, HOME renders and
+official artwork, all with the generated idle.
 
 Sprites and cries download on first use and are cached permanently, so a widget keeps
 animating with no connection. Only the searchable catalog and ~1,100 box icons (631 KB)

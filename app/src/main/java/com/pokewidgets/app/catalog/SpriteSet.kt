@@ -3,6 +3,19 @@ package com.pokewidgets.app.catalog
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/** Where a set's files are served from. Decides how [SpriteSet.path] becomes a URL. */
+object SpriteProvider {
+    /** PokeAPI/sprites on jsDelivr, pinned to one commit. */
+    const val POKEAPI = "pokeapi"
+
+    /**
+     * veekun.com's sprite dump — the only public host of the *original* animated battle
+     * sprites for Emerald, and of the second animation frame for Diamond/Pearl, Platinum
+     * and HeartGold/SoulSilver.
+     */
+    const val VEEKUN = "veekun"
+}
+
 /**
  * One game's sprite set, as emitted by `tools/build-catalog.mjs`.
  *
@@ -24,7 +37,32 @@ data class SpriteSet(
     val order: Int,
     val note: String? = null,
     val variants: Map<String, String>,
+    /** Which host serves [path]. See [SpriteProvider]. */
+    val provider: String = SpriteProvider.POKEAPI,
+    /**
+     * Sub-directories to assemble one animation from, when the game's frames are stored
+     * as separate still images rather than a single GIF.
+     *
+     * Generation 4's battle sprites are two-frame loops, and veekun stores the second
+     * frame in a parallel `frame2/` tree — so Diamond/Pearl, Platinum and
+     * HeartGold/SoulSilver become genuinely animated by fetching `""` and `"frame2"` and
+     * playing them in sequence. Empty means the set is a single file per sprite, which is
+     * every GIF set and every still one.
+     */
+    val frameDirs: List<String> = emptyList(),
+    /**
+     * How long each of [frameDirs] is held, in milliseconds. Same length as [frameDirs].
+     * The games hold the resting pose longer than the moved one, so these are uneven.
+     */
+    val frameDelaysMs: List<Int> = emptyList(),
 ) {
+
+    /** How many separate files one sprite of this set is assembled from. */
+    val partCount: Int get() = frameDirs.size.coerceAtLeast(1)
+
+    /** True when the animation is stitched from several stills rather than one GIF. */
+    val isComposite: Boolean get() = frameDirs.size > 1
+
     /** Ids covered by the plain front-facing variant. Parsed lazily; sets are long-lived. */
     val frontIds: IdRanges by lazy { IdRanges.parse(variants[""].orEmpty()) }
 

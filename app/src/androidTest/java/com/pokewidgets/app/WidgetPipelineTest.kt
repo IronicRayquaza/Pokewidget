@@ -18,6 +18,8 @@ import com.pokewidgets.app.data.SpriteSource
 import com.pokewidgets.app.sprite.BitmapOps
 import com.pokewidgets.app.sprite.FramePlanner
 import com.pokewidgets.app.sprite.GifFrames
+import com.pokewidgets.app.sprite.IdleAnimator
+import com.pokewidgets.app.sprite.IdleFrame
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -79,13 +81,31 @@ class WidgetPipelineTest {
         }
     }
 
+    /**
+     * Emerald ships as still PNGs, so its movement is generated. The point of the test is
+     * that generating it stays cheap: the loop must cost one bitmap per distinct *shape*,
+     * never one per step, or a still sprite would price itself out of the widget budget
+     * that a real animation fits inside.
+     */
     @Test
-    fun emeraldStatic_getsTheIdleBob_forFree() {
+    fun emeraldStatic_getsAGeneratedIdle_forAlmostNothing() {
         runBlocking {
             val result = assertPipelineFits(384, "versions_generation_iii_emerald", 160 to 160)
-            // The bob is four frames sharing one bitmap: motion at zero memory cost.
-            assertEquals("idle bob should emit 4 frames", 4, result.steps)
-            assertEquals("idle bob must reuse a single bitmap", 1, result.distinctFrames)
+            val style = IdleAnimator.DEFAULT
+            assertEquals(
+                "the generated idle should emit every step of its loop",
+                style.frames.size,
+                result.steps,
+            )
+            assertEquals(
+                "steps sharing a shape must share one bitmap",
+                IdleAnimator.distinctShapes(style),
+                result.distinctFrames,
+            )
+            assertTrue(
+                "translation must be free: fewer bitmaps than steps",
+                result.distinctFrames < result.steps,
+            )
         }
     }
 
@@ -158,18 +178,37 @@ class WidgetPipelineTest {
             steps = plan.stepCount
             distinct = plan.distinctFrames.size
         } else {
-            val scale = FramePlanner.fitScale(bounds.width(), bounds.height(), boxW, boxH, 8)
-            val bitmap = BitmapOps.cropAndScale(decoded.frames.first(), bounds, scale)
-            distinctBitmaps.add(bitmap)
-            val offsets = com.pokewidgets.app.sprite.IdleBob.offsets(scale)
-            for (offset in offsets) {
+            val style = IdleAnimator.DEFAULT
+            val frames = style.frames
+            val widest = frames.maxOf { it.scaleXPermille }
+            val tallest = frames.maxOf { it.scaleYPermille }
+            val scale = FramePlanner.fitScale(
+                bounds.width() * widest / IdleFrame.NATURAL,
+                bounds.height() * tallest / IdleFrame.NATURAL,
+                boxW,
+                boxH,
+                8,
+            )
+            val natural = BitmapOps.cropAndScale(decoded.frames.first(), bounds, scale)
+            val byShape = HashMap<Int, android.graphics.Bitmap>()
+            for (frame in frames) {
+                val bitmap = byShape.getOrPut(frame.shapeKey) {
+                    BitmapOps.resize(
+                        natural,
+                        natural.width * frame.scaleXPermille / IdleFrame.NATURAL,
+                        natural.height * frame.scaleYPermille / IdleFrame.NATURAL,
+                    ).also { distinctBitmaps.add(it) }
+                }
+                val plant = (natural.height - bitmap.height) / 2
+                val dy = frame.dySource * scale + plant
+                val dx = frame.dxSource * scale
                 val child = RemoteViews(context.packageName, R.layout.widget_frame)
                 child.setImageViewBitmap(R.id.widget_frame_image, bitmap)
-                child.setViewPadding(R.id.widget_frame_image, 0, offset, 0, -offset)
+                child.setViewPadding(R.id.widget_frame_image, dx, dy, -dx, -dy)
                 views.addView(R.id.widget_flipper, child)
             }
-            steps = offsets.size
-            distinct = 1
+            steps = frames.size
+            distinct = byShape.size
         }
 
         // Only the interval is remotable; autoStart lives in the layout XML.

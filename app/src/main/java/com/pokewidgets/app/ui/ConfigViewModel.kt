@@ -22,6 +22,8 @@ data class ConfigUiState(
     val entry: PokemonEntry? = null,
     /** Every set that can render the selected Pokémon, animated ones first. */
     val availableSets: List<SpriteSet> = emptyList(),
+    /** The set the widget is currently using, resolved from [config]. */
+    val selectedSet: SpriteSet? = null,
     val allPokemon: List<PokemonEntry> = emptyList(),
     val previewUrl: String? = null,
     val warning: String? = null,
@@ -116,6 +118,7 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 entry = entry,
                 availableSets = sets,
+                selectedSet = set,
                 previewUrl = url,
                 warning = when {
                     set == null -> "That sprite set is no longer available."

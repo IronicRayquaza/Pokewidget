@@ -14,8 +14,9 @@ Status snapshot for PokéWidget. See `README.md` for architecture and how-it-wor
       `RemoteViews.estimateMemoryUsage()` via reflection in an instrumented test.
 - [x] GIF decoding via Glide's standalone `gifdecoder`, nearest-neighbour integer
       upscaling, transparent-bounds cropping.
-- [x] Procedural idle bob for static sprites (all GBA sets, Gen 4, Gen 6+) — zero extra
-      bitmap cost, reuses one bitmap with varying `setViewPadding`.
+- [x] Generated idle animation for still sprites (`IdleAnimator`: breathe, bob, sway,
+      hover) — one bitmap per distinct shape rather than per step, translation via
+      `setViewPadding`.
 - [x] Crash-guard: `updateAppWidget` wrapped in try/catch, re-plans at a halved budget on
       `IllegalArgumentException`, falls back to a single still frame.
 
@@ -77,11 +78,19 @@ Status snapshot for PokéWidget. See `README.md` for architecture and how-it-wor
 
 ## Not delivered / known gaps
 
-- **No true GBA/Emerald in-game animation.** Every CDN-reachable sprite mirror
-  (including the pokestats.gg reference) only has static PNGs for Ruby/Sapphire,
-  Emerald, and FireRed/LeafGreen — the real 2-frame ROM animation isn't distributable
-  from any source used here. Static sets get the idle bob instead; this was a scoped
-  trade-off agreed with the user, not an oversight.
+- **Ruby/Sapphire and FireRed/LeafGreen are still static.** Emerald and all of Gen 4 now
+  use their real in-game animation from veekun, but veekun has no `animated/` or
+  `frame2/` tree for R/S or FR/LG, and no other public host carries them. Those two fall
+  back to the generated idle.
+- **Unown has no animated Emerald sprite.** veekun stores #201 per form (`201-a.gif`)
+  rather than by id, and there is no reliable mapping from those suffixes back to a
+  PokéAPI form id. It falls back to another set.
+- **Gen 4 previews in the app are static.** The picker previews a single URL through Coil,
+  which cannot stitch the two frames the way the widget renderer does. The widget itself
+  animates correctly.
+- **veekun has no CDN.** Its sets come from one origin with no mirror
+  (`veekun/pokedex-media` holds only a README). Acceptable because each sprite is fetched
+  once and cached forever, and a failed fetch degrades to the generated idle.
 - **Gen 5 animated icon set (APNG) skipped.** `versions/generation-v/icons/animated` is
   APNG, not GIF, and the decode pipeline is GIF-only. Listed in `SKIPPED_SETS` in
   `tools/sets.config.mjs` rather than silently dropped.

@@ -118,6 +118,25 @@ object BitmapOps {
     }
 
     /**
+     * Resizes to an exact pixel size with nearest-neighbour sampling.
+     *
+     * Unlike [cropAndScale] this permits a non-integer ratio, because the procedural idle
+     * animation needs shapes a few percent off natural — a squash of exactly 1x is no
+     * squash at all. Sampling stays nearest-neighbour, so a 3% vertical squash drops
+     * whole rows rather than blending them, which is precisely what the games do and what
+     * keeps the art crisp.
+     *
+     * Returns [source] itself when the requested size is already the current one, so a
+     * loop's natural-shape steps cost no extra bitmap.
+     */
+    fun resize(source: Bitmap, widthPx: Int, heightPx: Int): Bitmap {
+        val w = widthPx.coerceAtLeast(1)
+        val h = heightPx.coerceAtLeast(1)
+        if (w == source.width && h == source.height) return source
+        return Bitmap.createScaledBitmap(source, w, h, false)
+    }
+
+    /**
      * The widget's background plate. Drawn as its own bitmap rather than a themed
      * drawable so colour, opacity and corner radius are all freely configurable and the
      * sprite bitmaps stay pure alpha.

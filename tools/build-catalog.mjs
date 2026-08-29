@@ -10,17 +10,23 @@
  *   assets/icons.bin      concatenated box-icon PNGs for the offline picker grid
  *   assets/icons.idx      byte offsets into icons.bin, keyed by Pokémon id
  *
- * Everything is pinned to one commit of PokeAPI/sprites, so the output is
- * reproducible and the app's on-device cache never goes stale.
+ * PokeAPI content is pinned to one commit, so the output is reproducible and the app's
+ * on-device cache never goes stale. veekun's dump is a finished archive of shipped games
+ * and is not versioned, but it is equally immutable in practice.
+ *
+ * Two sources, because PokeAPI has no copy of the original animation for a third of the
+ * series: veekun is the only public host of Emerald's real battle animations and of the
+ * second frame of every Generation 4 idle. See VEEKUN_SETS in sets.config.mjs.
  *
  * Network shape: ~15 GitHub *API* calls (60/hour unauthenticated — hence the disk
- * cache in tools/.cache) plus unmetered raw.githubusercontent / jsDelivr fetches.
+ * cache in tools/.cache), a handful of veekun directory indexes, plus unmetered
+ * raw.githubusercontent / jsDelivr fetches.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SET_META, VARIANT_SEGMENTS, SKIPPED_SETS } from './sets.config.mjs';
+import { SET_META, VARIANT_SEGMENTS, SKIPPED_SETS, VEEKUN_SETS } from './sets.config.mjs';
 
 const SPRITES_SHA = 'c10459b9b0129eaca5c5d9b1cac65336debb1d08';
 const REPO = 'PokeAPI/sprites';
@@ -170,6 +176,53 @@ function classify(relPath) {
     id: Number(m[1]),
     ext: m[2],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Step 1b — veekun's sprite dump
+// ---------------------------------------------------------------------------
+
+const VEEKUN_BASE = 'https://veekun.com/dex/media';
+const VEEKUN_ROOT = 'pokemon/main-sprites';
+
+/**
+ * Ids present in one veekun directory.
+ *
+ * veekun has no API and no GitHub mirror — `veekun/pokedex-media` contains only a README
+ * — so coverage is read off the plain Apache directory index, which is stable and cheap
+ * (one request per directory). Files named for a form rather than an id, such as Unown's
+ * `201-a.gif`, are skipped: the app addresses sprites by PokéAPI id, and there is no
+ * reliable mapping from those suffixes back to a form id.
+ */
+async function listVeekunIds(dir, ext) {
+  const html = await fetchText(`${VEEKUN_BASE}/${VEEKUN_ROOT}/${dir}/`);
+  const ids = new Set();
+  const pattern = new RegExp(`href="(\\d+)\\.${ext}"`, 'gi');
+  for (const m of html.matchAll(pattern)) ids.add(Number(m[1]));
+  if (!ids.size) throw new Error(`no ${ext} sprites found in veekun "${dir}" — did the index change?`);
+  return ids;
+}
+
+/**
+ * Builds the `variants` map for one veekun set.
+ *
+ * For a composite set the answer is the *intersection* across frame directories: a
+ * Pokémon whose second frame is missing cannot be animated, and claiming otherwise would
+ * put a widget on a sprite that silently renders as a still.
+ */
+async function collectVeekunSet(setPath, meta) {
+  const frameDirs = meta.frameDirs ?? [''];
+  const variants = {};
+  for (const variant of meta.variants) {
+    let ids = null;
+    for (const frame of frameDirs) {
+      const dir = [setPath, frame, variant].filter(Boolean).join('/');
+      const found = await listVeekunIds(dir, meta.ext);
+      ids = ids === null ? found : new Set([...ids].filter((id) => found.has(id)));
+    }
+    variants[variant] = toRanges(ids ?? new Set());
+  }
+  return variants;
 }
 
 /** Collapse a sorted id list into `"1-1025,10001-10099"`. Sprite ids are near-contiguous. */
@@ -392,6 +445,46 @@ async function main() {
       variants: variantMap,
     });
   }
+
+  // veekun's sets carry the animation PokeAPI has no copy of: Emerald's real battle
+  // sequences, and the second frame of every Gen 4 idle.
+  console.log('     reading veekun directory indexes…');
+  for (const [setPath, m] of Object.entries(VEEKUN_SETS)) {
+    let variantMap;
+    try {
+      variantMap = await collectVeekunSet(setPath, m);
+    } catch (err) {
+      console.log(`     ! veekun set "${setPath}" unavailable (${err.message}) — skipped`);
+      continue;
+    }
+    const covered = Object.values(variantMap).some(Boolean);
+    if (!covered) {
+      console.log(`     ! veekun set "${setPath}" matched no sprites — skipped`);
+      continue;
+    }
+    sets.push({
+      id: `veekun_${setPath.replace(/[^a-z0-9]+/gi, '_')}`,
+      path: `${VEEKUN_ROOT}/${setPath}`,
+      label: m.label,
+      game: m.game,
+      hardware: m.hardware,
+      gen: m.gen,
+      animated: m.animated,
+      ext: m.ext,
+      order: m.order,
+      ...(m.note ? { note: m.note } : {}),
+      variants: variantMap,
+      provider: 'veekun',
+      ...(m.frameDirs ? { frameDirs: m.frameDirs } : {}),
+      ...(m.frameDelaysMs ? { frameDelaysMs: m.frameDelaysMs } : {}),
+    });
+    const front = variantMap[''] ?? '';
+    const count = front.split(',').filter(Boolean)
+      .reduce((n, p) => { const [a, b] = p.split('-').map(Number); return n + (b ?? a) - a + 1; }, 0);
+    console.log(`       ${m.label.padEnd(26)} ${String(count).padStart(4)} sprites` +
+      `${m.frameDirs ? `, ${m.frameDirs.length} frames each` : ''}`);
+  }
+
   sets.sort((a, b) => a.order - b.order);
 
   // Only ship metadata for Pokémon at least one set can actually render.
@@ -432,7 +525,7 @@ async function main() {
 
   console.log('\n4/4  summary');
   const animated = sets.filter((s) => s.animated);
-  console.log(`     ${sets.length} sprite sets — ${animated.length} animated, ${sets.length - animated.length} static (idle bob)`);
+  console.log(`     ${sets.length} sprite sets — ${animated.length} animated, ${sets.length - animated.length} still (generated idle)`);
   for (const s of sets) {
     const front = s.variants[''] ?? '';
     const count = front.split(',').filter(Boolean).reduce((acc, part) => {

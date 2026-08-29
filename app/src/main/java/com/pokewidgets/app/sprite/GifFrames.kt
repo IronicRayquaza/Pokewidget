@@ -32,8 +32,49 @@ object GifFrames {
     /** Guards against a pathological GIF exhausting memory before the planner sees it. */
     private const val MAX_SOURCE_FRAMES = 200
 
+    /** Hold time for a composite frame whose set gives no explicit delay. */
+    private const val DEFAULT_COMPOSITE_DELAY_MS = 300
+
     fun decode(bytes: ByteArray, isGif: Boolean): DecodedSprite? =
         if (isGif) decodeGif(bytes) else decodeStill(bytes)
+
+    /**
+     * Decodes a sprite that may be spread across several files.
+     *
+     * Generation 4's battle sprites are two-frame loops whose frames are stored as
+     * separate PNGs, so Diamond/Pearl, Platinum and HeartGold/SoulSilver only animate if
+     * the parts are stitched back together here. One part behaves exactly as [decode].
+     *
+     * @param delaysMs how long to hold each part. Falls back to an even split when the
+     *   set does not say, and is padded if it is shorter than [parts].
+     */
+    fun decode(parts: List<ByteArray>, isGif: Boolean, delaysMs: List<Int>): DecodedSprite? {
+        if (parts.isEmpty()) return null
+        if (parts.size == 1) return decode(parts.first(), isGif)
+
+        val frames = ArrayList<Bitmap>(parts.size)
+        val delays = ArrayList<Int>(parts.size)
+        for ((index, bytes) in parts.withIndex()) {
+            // Each part is one still frame; a composite set is never itself a GIF.
+            val decoded = decodeStill(bytes) ?: continue
+            frames.add(decoded.frames.first())
+            delays.add(delaysMs.getOrNull(index) ?: DEFAULT_COMPOSITE_DELAY_MS)
+        }
+        if (frames.isEmpty()) return null
+
+        // Frames must share a canvas: the planner crops to the union of their opaque
+        // bounds and scales them by one factor, so a part that decoded at a different
+        // size would jump. Upstream keeps a game's sprites on a fixed canvas, so this
+        // only fires if a fetch returned something unexpected.
+        val width = frames.first().width
+        val height = frames.first().height
+        if (frames.any { it.width != width || it.height != height }) {
+            Log.w(TAG, "composite frames disagree on size; falling back to the first")
+            for (i in 1 until frames.size) frames[i].recycle()
+            return DecodedSprite(listOf(frames.first()), listOf(delays.first()))
+        }
+        return DecodedSprite(frames, delays)
+    }
 
     private fun decodeStill(bytes: ByteArray): DecodedSprite? {
         val opts = BitmapFactory.Options().apply {

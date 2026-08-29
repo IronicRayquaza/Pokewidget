@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.pokewidgets.app.catalog.SpriteSet
 import com.pokewidgets.app.data.Fill
 import com.pokewidgets.app.data.Smoothness
+import com.pokewidgets.app.sprite.IdleStyle
 import com.pokewidgets.app.data.TapAction
 import com.pokewidgets.app.data.WidgetConfig
 import com.pokewidgets.app.ui.ConfigUiState
@@ -258,7 +259,7 @@ private fun SetCard(set: SpriteSet, selected: Boolean, onClick: () -> Unit) {
             )
             if (!set.animated) {
                 Text(
-                    "still · idle bob",
+                    "still · generated idle",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -380,6 +381,29 @@ private fun AnimationSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> 
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        // Only meaningful for still art. Showing it against Black/White or Showdown would
+        // offer a choice that changes nothing.
+        AnimatedVisibility(visible = state.selectedSet?.animated == false) {
+            Column {
+                Spacer(Modifier.height(16.dp))
+                SectionHeader("Idle movement")
+                OptionRow(
+                    options = IdleStyle.entries,
+                    selected = c.idleStyle,
+                    label = { it.label },
+                    onSelect = { s -> onUpdate { it.copy(idleStyle = s) } },
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "${c.idleStyle.description}. ${state.selectedSet?.label ?: "This set"} " +
+                        "ships as still images — its real in-game animation only exists " +
+                        "inside the ROM, so PokéWidget generates the movement instead.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
 
         Spacer(Modifier.height(16.dp))
         SectionHeader("Sprite size")

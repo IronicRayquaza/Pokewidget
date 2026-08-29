@@ -21,7 +21,9 @@ import com.pokewidgets.app.sprite.BitmapOps
 import com.pokewidgets.app.sprite.DecodedSprite
 import com.pokewidgets.app.sprite.FramePlanner
 import com.pokewidgets.app.sprite.GifFrames
-import com.pokewidgets.app.sprite.IdleBob
+import com.pokewidgets.app.sprite.IdleAnimator
+import com.pokewidgets.app.sprite.IdleFrame
+import com.pokewidgets.app.sprite.IdleStyle
 import kotlin.math.roundToInt
 
 /**
@@ -101,7 +103,7 @@ class WidgetRenderer(private val context: Context) {
         val set = catalog.set(config.setId)
             ?: return statusViews(widgetId, config, "Sprite set unavailable")
 
-        val bytes = source.spriteBytes(set, config.spriteKey)
+        val parts = source.spriteParts(set, config.spriteKey)
             ?: return statusViews(
                 widgetId,
                 config,
@@ -112,7 +114,7 @@ class WidgetRenderer(private val context: Context) {
                 },
             )
 
-        val decoded = GifFrames.decode(bytes, isGif = set.ext == "gif")
+        val decoded = GifFrames.decode(parts, isGif = set.ext == "gif", delaysMs = set.frameDelaysMs)
             ?: return statusViews(widgetId, config, "Couldn't decode sprite")
 
         return try {
@@ -160,7 +162,7 @@ class WidgetRenderer(private val context: Context) {
         if (set.animated && decoded.frames.size > 1) {
             addAnimatedFrames(views, decoded, bounds, config, boxW, boxH, budget, speedUp)
         } else {
-            addIdleBobFrames(views, decoded, bounds, config, boxW, boxH, budget, speedUp)
+            addIdleFrames(views, decoded, bounds, config, boxW, boxH, budget, speedUp)
         }
 
         views.setOnClickPendingIntent(R.id.widget_root, tapIntent(widgetId))
@@ -221,13 +223,16 @@ class WidgetRenderer(private val context: Context) {
     }
 
     /**
-     * Static sprites — every GBA set, all of Gen 4, and everything from Gen 6 on — get a
-     * generated idle bob instead of sitting dead on the home screen.
+     * Still sprites — every GBA set including Emerald, all of Gen 4, and everything from
+     * Gen 6 on — get a generated idle animation instead of sitting dead on the home
+     * screen. See [IdleAnimator] for why those games have no animated sprites to fetch.
      *
-     * It costs exactly one bitmap: the same instance goes into every frame, and only the
-     * padding differs.
+     * The cost is one bitmap per distinct *shape* in the loop, not one per step:
+     * translation is expressed as padding, and `RemoteViews.BitmapCache` dedupes by
+     * object identity, so a ten-step sway is still a single bitmap and a six-step breath
+     * is three.
      */
-    private fun addIdleBobFrames(
+    private fun addIdleFrames(
         views: RemoteViews,
         decoded: DecodedSprite,
         bounds: android.graphics.Rect,
@@ -237,31 +242,80 @@ class WidgetRenderer(private val context: Context) {
         budget: Long,
         speedUp: Double,
     ) {
+        val source = decoded.frames.firstOrNull() ?: return
+        // Leave room for the widest step, so a breath does not clip at the edges of a
+        // snugly-fitted widget.
+        val style = config.idleStyle
+        val widest = style.frames.maxOfOrNull { it.scaleXPermille } ?: IdleFrame.NATURAL
+        val tallest = style.frames.maxOfOrNull { it.scaleYPermille } ?: IdleFrame.NATURAL
         val scale = FramePlanner.fitScale(
-            bounds.width(), bounds.height(), boxW, boxH, config.fill.maxScale,
+            contentWidth = bounds.width() * widest / IdleFrame.NATURAL,
+            contentHeight = bounds.height() * tallest / IdleFrame.NATURAL,
+            targetWidthPx = boxW,
+            targetHeightPx = boxH,
+            maxScale = config.fill.maxScale,
         )
-        val frame = decoded.frames.firstOrNull() ?: return
-        val bitmap = BitmapOps.cropAndScale(frame, bounds, scale)
+        val natural = BitmapOps.cropAndScale(source, bounds, scale)
 
-        val cost = bitmap.width.toLong() * bitmap.height * 4L
-        if (cost > budget) {
-            // Vanishingly unlikely at these sprite sizes, but a still frame beats a crash.
-            val smaller = BitmapOps.cropAndScale(frame, bounds, 1)
-            val child = RemoteViews(context.packageName, R.layout.widget_frame)
-            child.setImageViewBitmap(R.id.widget_frame_image, smaller)
-            views.addView(R.id.widget_flipper, child)
-            return
+        val frames = style.frames
+        val shapes = frames.distinctBy { it.shapeKey }
+        val perBitmap = natural.width.toLong() * natural.height * 4L
+
+        // Shape changes are the only thing here that costs memory, so they are the only
+        // thing worth giving up. Drop to pure translation, then to a single still frame.
+        val affordable = when {
+            perBitmap * shapes.size <= budget -> frames
+            perBitmap * 2 <= budget -> IdleStyle.BOB.frames
+            perBitmap <= budget -> listOf(IdleFrame())
+            else -> {
+                // Vanishingly unlikely at sprite sizes, but a still frame beats a crash.
+                addStill(views, BitmapOps.cropAndScale(source, bounds, 1))
+                return
+            }
         }
 
-        for (offsetPx in IdleBob.offsets(scale)) {
+        val byShape = HashMap<Int, Bitmap>(shapes.size)
+        for (frame in affordable) {
+            byShape.getOrPut(frame.shapeKey) {
+                BitmapOps.resize(
+                    natural,
+                    natural.width * frame.scaleXPermille / IdleFrame.NATURAL,
+                    natural.height * frame.scaleYPermille / IdleFrame.NATURAL,
+                )
+            }
+        }
+
+        for (frame in affordable) {
+            val bitmap = byShape[frame.shapeKey] ?: natural
             val child = RemoteViews(context.packageName, R.layout.widget_frame)
             child.setImageViewBitmap(R.id.widget_frame_image, bitmap)
-            // Positive top padding pushes the sprite down; the negative bottom padding
-            // keeps the image box the same size so nothing reflows between frames.
-            child.setViewPadding(R.id.widget_frame_image, 0, offsetPx, 0, -offsetPx)
+
+            // The frame's ImageView is scaleType="center", so a shorter bitmap would
+            // float upward as it squashes. Pushing down by half the height it lost keeps
+            // the sprite's feet planted, which is what makes a squash read as weight
+            // rather than as the whole creature shrinking.
+            val plant = (natural.height - bitmap.height) / 2
+            val dy = frame.dySource * scale + plant
+            val dx = frame.dxSource * scale
+            // The equal-and-opposite padding on the far side keeps the content box the
+            // same size, so nothing reflows between steps.
+            child.setViewPadding(R.id.widget_frame_image, dx, dy, -dx, -dy)
             views.addView(R.id.widget_flipper, child)
         }
-        startFlipping(views, (IdleBob.FRAME_INTERVAL_MS / speedUp).roundToInt())
+
+        if (affordable.size <= 1) return
+        startFlipping(views, (style.frameIntervalMs / speedUp).roundToInt())
+        Log.d(
+            TAG,
+            "idle ${style.name.lowercase()}: ${affordable.size} steps / ${byShape.size} " +
+                "bitmaps, scale $scale, ${perBitmap * byShape.size / 1024} KB of $budget",
+        )
+    }
+
+    private fun addStill(views: RemoteViews, bitmap: Bitmap) {
+        val child = RemoteViews(context.packageName, R.layout.widget_frame)
+        child.setImageViewBitmap(R.id.widget_frame_image, bitmap)
+        views.addView(R.id.widget_flipper, child)
     }
 
     /**

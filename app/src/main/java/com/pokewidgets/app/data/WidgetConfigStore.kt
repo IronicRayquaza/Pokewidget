@@ -52,6 +52,7 @@ class WidgetConfigStore(context: Context) {
             prefs[Keys.smoothness(widgetId)] = config.smoothness.name
             prefs[Keys.fill(widgetId)] = config.fill.name
             prefs[Keys.tap(widgetId)] = config.tapAction.name
+            prefs[Keys.idleStyle(widgetId)] = config.idleStyle.name
             prefs[Keys.excited(widgetId)] = config.excitedUntilMs
         }
     }
@@ -134,6 +135,7 @@ class WidgetConfigStore(context: Context) {
             smoothness = prefs[Keys.smoothness(id)].toEnum(d.smoothness),
             fill = prefs[Keys.fill(id)].toEnum(d.fill),
             tapAction = prefs[Keys.tap(id)].toEnum(d.tapAction),
+            idleStyle = prefs[Keys.idleStyle(id)].toEnum(d.idleStyle),
             excitedUntilMs = prefs[Keys.excited(id)] ?: 0L,
         )
     }
@@ -166,6 +168,7 @@ class WidgetConfigStore(context: Context) {
         fun smoothness(id: Int) = stringPreferencesKey("$id.smoothness")
         fun fill(id: Int) = stringPreferencesKey("$id.fill")
         fun tap(id: Int) = stringPreferencesKey("$id.tap")
+        fun idleStyle(id: Int) = stringPreferencesKey("$id.idleStyle")
         fun excited(id: Int) = longPreferencesKey("$id.excited")
     }
 }
