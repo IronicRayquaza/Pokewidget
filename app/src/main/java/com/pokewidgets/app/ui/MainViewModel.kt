@@ -12,12 +12,19 @@ import com.pokewidgets.app.catalog.SpriteSet
 import com.pokewidgets.app.data.SpriteSource
 import com.pokewidgets.app.data.WidgetConfig
 import com.pokewidgets.app.data.WidgetConfigStore
+import com.pokewidgets.app.widget.CryPlayer
 import com.pokewidgets.app.widget.PokemonWidgetProvider
 import com.pokewidgets.app.widget.WidgetRenderer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,13 +62,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(MainUiState())
     val state: StateFlow<MainUiState> = _state.asStateFlow()
 
-    private var all: List<PokemonEntry> = emptyList()
-    private var animatedIds: Set<Int> = emptySet()
+    /** What the results list is currently filtered by. Drives [results] off the UI thread. */
+    private data class Filters(
+        val query: String = "",
+        val generation: Int? = null,
+        val animatedOnly: Boolean = false,
+    )
+
+    private val filters = MutableStateFlow(Filters())
+    private val allPokemon = MutableStateFlow<List<PokemonEntry>>(emptyList())
+    private val animatedIds = MutableStateFlow<Set<Int>>(emptySet())
+
+    private var cryJob: Job? = null
 
     init {
         viewModelScope.launch {
-            all = catalog.pokemon()
-            animatedIds = catalog.animatedPokemonIds()
+            allPokemon.value = catalog.pokemon()
+            animatedIds.value = catalog.animatedPokemonIds()
             _state.update {
                 it.copy(
                     loading = false,
@@ -69,35 +86,74 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         .isRequestPinAppWidgetSupported,
                 )
             }
-            applyFilters()
             refreshPlaced()
             refreshCacheSize()
+        }
+        observeFilters()
+    }
+
+    /**
+     * Recomputes the results list off the main thread, and only for the keystroke the
+     * user actually stopped on.
+     *
+     * Filtering 1,345 entries is not expensive in isolation, but it was running
+     * synchronously inside `setQuery` — so a six-letter search ran it six times on the UI
+     * thread, each one competing with the recomposition and the icon decodes it had just
+     * invalidated. That is what the dropped frames during search actually were.
+     * `mapLatest` throws away the work for every intermediate keystroke.
+     */
+    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+    private fun observeFilters() {
+        viewModelScope.launch {
+            combine(allPokemon, animatedIds, filters) { all, ids, f -> Triple(all, ids, f) }
+                // Typing gets a short settle; a chip tap is a deliberate single act and
+                // should feel instant.
+                .debounce { (_, _, f) -> if (f.query.isBlank()) 0L else QUERY_DEBOUNCE_MS }
+                .mapLatest { (all, ids, f) ->
+                    withContext(Dispatchers.Default) {
+                        all.filter { entry ->
+                            entry.matches(f.query) &&
+                                (f.generation == null || entry.generation == f.generation) &&
+                                (!f.animatedOnly || entry.id in ids)
+                        }
+                    }
+                }
+                .collect { results -> _state.update { it.copy(results = results) } }
         }
     }
 
     fun setQuery(q: String) {
+        // The text field must echo the keystroke immediately; only the *results* wait.
         _state.update { it.copy(query = q) }
-        applyFilters()
+        filters.update { it.copy(query = q) }
     }
 
     fun setGeneration(gen: Int?) {
         _state.update { it.copy(generation = gen) }
-        applyFilters()
+        filters.update { it.copy(generation = gen) }
     }
 
     fun setAnimatedOnly(only: Boolean) {
         _state.update { it.copy(animatedOnly = only) }
-        applyFilters()
+        filters.update { it.copy(animatedOnly = only) }
     }
 
-    private fun applyFilters() {
-        val s = _state.value
-        val results = all.filter { entry ->
-            entry.matches(s.query) &&
-                (s.generation == null || entry.generation == s.generation) &&
-                (!s.animatedOnly || entry.id in animatedIds)
+    /**
+     * Plays a Pokémon's cry, cancelling whichever one was still sounding.
+     *
+     * Silent mode is deliberately ignored here: unlike the widget, this is a sound the
+     * user asked for by tapping the Pokémon, and it goes out over the media stream.
+     */
+    fun playCry(pokemonId: Int) {
+        cryJob?.cancel()
+        cryJob = viewModelScope.launch {
+            CryPlayer.play(
+                getApplication(),
+                pokemonId,
+                legacy = LEGACY_CRY,
+                respectSilentMode = false,
+            )
         }
-        _state.update { it.copy(results = results) }
     }
 
     fun openDetail(entry: PokemonEntry) {
@@ -110,6 +166,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             _state.update { it.copy(detailSets = sets) }
         }
+        // Opening a Pokémon announces it. This is the tap the bug report is about: until
+        // now, choosing a Pokémon anywhere in the app was completely silent.
+        playCry(entry.id)
     }
 
     fun closeDetail() = _state.update { it.copy(detail = null, detailSets = emptyList()) }
@@ -159,5 +218,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.IO) { source.clearCache() }
             refreshCacheSize()
         }
+    }
+
+    private companion object {
+        /**
+         * Long enough to skip the intermediate states of a fast typist, short enough that
+         * the grid still feels like it is keeping up.
+         */
+        const val QUERY_DEBOUNCE_MS = 120L
+
+        /**
+         * Prefer the GBA-era cry in the app, matching the widget's default so a Pokémon
+         * sounds the same in both places. [SpriteSource.cryFile] falls back on its own
+         * for the Pokémon that have no legacy recording.
+         */
+        const val LEGACY_CRY = true
     }
 }

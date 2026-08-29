@@ -64,12 +64,20 @@ fun PokemonIcon(
     fallbackUrl: String? = null,
 ) {
     val context = LocalContext.current
-    var bitmap by remember(pokemonId) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var loaded by remember(pokemonId) { mutableStateOf(false) }
+    val catalog = remember(context) { CatalogRepository.get(context) }
+
+    // Seed from the cache during composition. A cell scrolled back into view then paints
+    // its icon on the very first frame instead of flashing a placeholder while a
+    // coroutine re-delivers a bitmap that was already in memory.
+    val cached = catalog.cachedIcon(pokemonId)
+    var bitmap by remember(pokemonId) { mutableStateOf(cached) }
+    var loaded by remember(pokemonId) { mutableStateOf(cached != null) }
 
     LaunchedEffect(pokemonId) {
-        bitmap = CatalogRepository.get(context).icon(pokemonId)
-        loaded = true
+        if (bitmap == null) {
+            bitmap = catalog.icon(pokemonId)
+            loaded = true
+        }
     }
 
     Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {

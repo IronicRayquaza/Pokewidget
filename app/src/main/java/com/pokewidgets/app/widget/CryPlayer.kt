@@ -23,10 +23,23 @@ object CryPlayer {
     private const val TAG = "CryPlayer"
     private const val MAX_WAIT_MS = 6_000L
 
-    suspend fun play(context: Context, pokemonId: Int, legacy: Boolean) {
+    /**
+     * @param respectSilentMode skip playback entirely when the phone is on silent or
+     *   vibrate. True for widget taps: a home-screen widget that blares in a meeting is a
+     *   widget that gets uninstalled. False for taps inside the app, where the sound is
+     *   the point of the gesture — the ringer setting governs ringtones and
+     *   notifications, not media an app plays because the user asked it to, which is why
+     *   a video still has audio on a silenced phone.
+     */
+    suspend fun play(
+        context: Context,
+        pokemonId: Int,
+        legacy: Boolean,
+        respectSilentMode: Boolean = true,
+    ) {
         val audio = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
 
-        if (audio.ringerMode != AudioManager.RINGER_MODE_NORMAL) {
+        if (respectSilentMode && audio.ringerMode != AudioManager.RINGER_MODE_NORMAL) {
             Log.d(TAG, "ringer is silent/vibrate — skipping cry")
             return
         }
@@ -38,7 +51,16 @@ object CryPlayer {
             }
 
         val attributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            .setUsage(
+                // Sonification is right for a widget: it is a system-surface blip. In the
+                // app the cry is content the user asked for, so it belongs on the media
+                // stream, which is also the one their volume keys are already adjusting.
+                if (respectSilentMode) {
+                    AudioAttributes.USAGE_ASSISTANCE_SONIFICATION
+                } else {
+                    AudioAttributes.USAGE_MEDIA
+                },
+            )
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
 

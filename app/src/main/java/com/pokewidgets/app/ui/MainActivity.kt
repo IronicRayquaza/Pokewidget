@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
                             )
                         },
                         onClearCache = viewModel::clearCache,
+                        onPlayCry = viewModel::playCry,
                     )
                 }
             }

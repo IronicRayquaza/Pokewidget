@@ -1,6 +1,7 @@
 package com.pokewidgets.app.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pokewidgets.app.catalog.PokemonEntry
@@ -50,6 +53,8 @@ import com.pokewidgets.app.ui.MainUiState
 import com.pokewidgets.app.ui.PlacedWidget
 import com.pokewidgets.app.ui.SetPreview
 import com.pokewidgets.app.ui.components.PokemonIcon
+import com.pokewidgets.app.ui.components.cryHop
+import com.pokewidgets.app.ui.components.pressScale
 import com.pokewidgets.app.ui.components.SpriteImage
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,6 +69,7 @@ fun MainScreen(
     onPin: (Int, String) -> Unit,
     onEditWidget: (Int) -> Unit,
     onClearCache: () -> Unit,
+    onPlayCry: (Int) -> Unit,
 ) {
     var showSettings by remember { mutableStateOf(false) }
 
@@ -147,8 +153,14 @@ fun MainScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(state.results, key = { it.id }) { entry ->
+                        val interactions = remember { MutableInteractionSource() }
                         Card(
-                            modifier = Modifier.clickable { onOpenDetail(entry) },
+                            modifier = Modifier
+                                .pressScale(interactions)
+                                .clickable(
+                                    interactionSource = interactions,
+                                    indication = ripple(),
+                                ) { onOpenDetail(entry) },
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             ),
@@ -183,7 +195,7 @@ fun MainScreen(
 
     state.detail?.let { entry ->
         ModalBottomSheet(onDismissRequest = onCloseDetail) {
-            DetailSheet(entry, state.detailSets, state.canPin, onPin)
+            DetailSheet(entry, state.detailSets, state.canPin, onPin, onPlayCry)
         }
     }
 
@@ -205,6 +217,7 @@ private fun DetailSheet(
     sets: List<SetPreview>,
     canPin: Boolean,
     onPin: (Int, String) -> Unit,
+    onPlayCry: (Int) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
         Text(entry.displayName, style = MaterialTheme.typography.headlineSmall)
@@ -218,6 +231,10 @@ private fun DetailSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        Spacer(Modifier.height(16.dp))
+
+        HeroSprite(entry, sets, onPlayCry)
 
         Spacer(Modifier.height(16.dp))
 
@@ -284,6 +301,60 @@ private fun DetailSheet(
             )
         }
     }
+}
+
+/**
+ * The Pokémon itself, big, animated, and tappable.
+ *
+ * This is the answer to "tapping a Pokémon does nothing": every tap replays the cry and
+ * plays a squash-and-stretch hop, so the gesture lands even with the volume down. It
+ * prefers an animated set so the sprite is already moving before it is touched.
+ */
+@Composable
+private fun HeroSprite(
+    entry: PokemonEntry,
+    sets: List<SetPreview>,
+    onPlayCry: (Int) -> Unit,
+) {
+    // Counts taps rather than tracking a boolean, so holding the sprite down and tapping
+    // repeatedly restarts the hop each time instead of only toggling it.
+    var hops by remember(entry.id) { mutableStateOf(0) }
+    val interactions = remember { MutableInteractionSource() }
+    val hero = remember(sets) { sets.firstOrNull { it.set.animated } ?: sets.firstOrNull() }
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(148.dp)
+            .clickable(
+                interactionSource = interactions,
+                indication = null,
+            ) {
+                hops++
+                onPlayCry(entry.id)
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (hero == null) {
+            PokemonIcon(entry.id, entry.displayName, size = 96.dp)
+        } else {
+            SpriteImage(
+                hero.url,
+                entry.displayName,
+                Modifier
+                    .fillMaxSize()
+                    .pressScale(interactions, pressedScale = 0.94f)
+                    .cryHop(hops),
+            )
+        }
+    }
+    Text(
+        "Tap to hear the cry",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+        textAlign = TextAlign.Center,
+    )
 }
 
 @Composable

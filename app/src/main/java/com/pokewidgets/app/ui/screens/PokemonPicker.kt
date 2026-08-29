@@ -1,6 +1,7 @@
 package com.pokewidgets.app.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -40,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pokewidgets.app.catalog.PokemonEntry
 import com.pokewidgets.app.ui.components.PokemonIcon
+import com.pokewidgets.app.ui.components.pressScale
 
 /**
  * Search and browse all 1345 catalogued Pokémon and forms.
@@ -130,8 +133,15 @@ fun PokemonPicker(
 
 @Composable
 private fun PokemonCell(entry: PokemonEntry, selected: Boolean, onClick: () -> Unit) {
+    val interactions = remember { MutableInteractionSource() }
     Card(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .pressScale(interactions)
+            .clickable(
+                interactionSource = interactions,
+                indication = ripple(),
+                onClick = onClick,
+            ),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) {
                 MaterialTheme.colorScheme.primaryContainer
