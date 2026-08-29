@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.pokewidgets.app"
-    compileSdk = 36
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.pokewidgets.app"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -57,7 +57,7 @@ android {
         buildConfig = true
     }
 
-    packaging {
+    packagingOptions {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
 
@@ -78,11 +78,18 @@ android {
      * whole group makes that failure mode unrepresentable rather than merely unlikely.
      */
     configurations.all {
-        resolutionStrategy.eachDependency {
-            if (requested.group == "androidx.lifecycle") {
-                useVersion(libs.versions.lifecycle.get())
-                because("every lifecycle artifact must come from the same release")
-            }
+        resolutionStrategy {
+            force("androidx.appcompat:appcompat:1.6.1")
+            force("androidx.appcompat:appcompat-resources:1.6.1")
+            force("androidx.activity:activity:1.8.2")
+            force("androidx.activity:activity-compose:1.8.2")
+            force("androidx.core:core-ktx:1.12.0")
+            force("androidx.core:core:1.12.0")
+            force("androidx.profileinstaller:profileinstaller:1.3.1")
+            force("androidx.vectordrawable:vectordrawable:1.1.0")
+            force("androidx.vectordrawable:vectordrawable-animated:1.1.0")
+            force("androidx.lifecycle:lifecycle-livedata-core:2.7.0")
+            force("androidx.lifecycle:lifecycle-livedata:2.7.0")
         }
     }
 }
