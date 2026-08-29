@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.pokewidgets.app"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.pokewidgets.app"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -57,7 +57,7 @@ android {
         buildConfig = true
     }
 
-    packagingOptions {
+    packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
 
@@ -65,16 +65,24 @@ android {
         unitTests.isReturnDefaultValues = true
     }
 
+    /**
+     * Pins every `androidx.lifecycle` artifact to one version.
+     *
+     * Without this the module versions drift apart: we ask for lifecycle directly, but
+     * Compose Material3 also depends on `lifecycle-viewmodel-compose`, and Gradle's
+     * "highest wins" rule resolves that one transitively while leaving the others where
+     * we declared them. A newer `lifecycle-viewmodel-compose` calls
+     * `ViewModelProvider.Companion` — a field that only exists from 2.8.0, when the class
+     * was rewritten in Kotlin — so a split classpath compiles cleanly and then dies with
+     * `NoSuchFieldError` on the first composition that calls `viewModel()`. Aligning the
+     * whole group makes that failure mode unrepresentable rather than merely unlikely.
+     */
     configurations.all {
-        resolutionStrategy {
-            force("androidx.appcompat:appcompat:1.6.1")
-            force("androidx.appcompat:appcompat-resources:1.6.1")
-            force("androidx.core:core-ktx:1.12.0")
-            force("androidx.core:core:1.12.0")
-            force("androidx.lifecycle:lifecycle-livedata-core:2.7.0")
-            force("androidx.profileinstaller:profileinstaller:1.3.1")
-            force("androidx.vectordrawable:vectordrawable:1.1.0")
-            force("androidx.vectordrawable:vectordrawable-animated:1.1.0")
+        resolutionStrategy.eachDependency {
+            if (requested.group == "androidx.lifecycle") {
+                useVersion(libs.versions.lifecycle.get())
+                because("every lifecycle artifact must come from the same release")
+            }
         }
     }
 }
