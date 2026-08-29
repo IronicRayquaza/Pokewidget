@@ -10,3 +10,9 @@ captures/
 local.properties
 node_modules/
 tools/.cache/
+
+# Captured device logs. `crash_log.txt` alone was 89 MB of UTF-16 logcat, which
+# bloats every clone forever for something only useful while a bug is open.
+crash_log.txt
+pid*.log
+*.logcat
