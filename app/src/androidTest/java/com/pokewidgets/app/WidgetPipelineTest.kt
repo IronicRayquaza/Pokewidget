@@ -2,6 +2,8 @@ package com.pokewidgets.app
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
+import android.graphics.Rect
+import android.os.Parcel
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +24,7 @@ import com.pokewidgets.app.sprite.IdleAnimator
 import com.pokewidgets.app.sprite.IdleFrame
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -106,6 +109,78 @@ class WidgetPipelineTest {
                 "translation must be free: fewer bitmaps than steps",
                 result.distinctFrames < result.steps,
             )
+        }
+    }
+
+    /**
+     * The regression that made entire sprite sets invisible on the home screen.
+     *
+     * Two independent faults met on the same sprite. X/Y (and much of Scarlet/Violet)
+     * ships its art pre-cropped, so the opaque bounds are the whole canvas; on a widget
+     * too small to upscale into, the planner settles on 1x. `BitmapOps.cropAndScale` then
+     * had nothing to do and returned the *decoded source frame* itself — which
+     * `WidgetRenderer.buildViews` recycles the moment it has composed the RemoteViews,
+     * before `updateAppWidget` ever parcels it. The launcher was handed a recycled bitmap,
+     * `updateAppWidget` threw IllegalStateException, and because only
+     * IllegalArgumentException was caught the throw escaped to a `runCatching` that logged
+     * it — leaving the widget sitting on its placeholder forever.
+     *
+     * The order below is the renderer's real order, and it is the whole point of the
+     * test: the pipeline test above recycles only after inflating, which is exactly why
+     * it never saw this.
+     */
+    @Test
+    fun aFullCanvasSprite_onATinyWidget_survivesTheSourceBeingRecycled() {
+        runBlocking {
+            val set = CatalogRepository.get(context).set("versions_generation_vi_x_y")
+            assertNotNull("X/Y set missing from the generated catalog", set)
+            val bytes = SpriteSource(context).spriteBytes(set!!, SpriteKey(set.id, CHARIZARD))
+            assertNotNull("could not fetch X/Y Charizard (is the device online?)", bytes)
+
+            val decoded = GifFrames.decode(bytes!!, isGif = false)
+            assertNotNull("could not decode X/Y Charizard", decoded)
+            decoded!!
+
+            val bounds = BitmapOps.unionOpaqueBounds(decoded.frames)
+            assertEquals(
+                "X/Y art is stored pre-cropped, which is what makes this case reachable",
+                Rect(0, 0, decoded.width, decoded.height),
+                bounds,
+            )
+
+            // A 1x1 widget is smaller than the sprite, so there is no upscale to apply.
+            val scale = FramePlanner.fitScale(bounds.width(), bounds.height(), BOX, BOX, 8)
+            assertEquals("a widget this small leaves nothing to upscale", 1, scale)
+
+            val source = decoded.frames.first()
+            val frame = BitmapOps.cropScaleFit(source, bounds, scale, BOX, BOX)
+            assertNotEquals(
+                "the decoded source frame must never be handed to RemoteViews: " +
+                    "the renderer recycles it before the launcher reads it",
+                System.identityHashCode(source),
+                System.identityHashCode(frame),
+            )
+            assertTrue(
+                "the sprite must be fitted into the box; scaleType=center only clips " +
+                    "(got " + frame.width + "x" + frame.height + " into a " + BOX + " px box)",
+                frame.width <= BOX && frame.height <= BOX,
+            )
+
+            val views = RemoteViews(context.packageName, R.layout.widget_root)
+            views.removeAllViews(R.id.widget_flipper)
+            val child = RemoteViews(context.packageName, R.layout.widget_frame)
+            child.setImageViewBitmap(R.id.widget_frame_image, frame)
+            views.addView(R.id.widget_flipper, child)
+
+            // The renderer's order: sources gone, then the RemoteViews goes over binder.
+            // Parcelling is what updateAppWidget does next, and it is what throws.
+            decoded.recycle()
+            val parcel = Parcel.obtain()
+            try {
+                views.writeToParcel(parcel, 0)
+            } finally {
+                parcel.recycle()
+            }
         }
     }
 
@@ -285,5 +360,10 @@ class WidgetPipelineTest {
 
         /** Padding for the cache's own bookkeeping, which is bytes, not megabytes. */
         const val BITMAP_ACCOUNTING_SLACK = 64L * 1024
+
+        const val CHARIZARD = 6
+
+        /** A 1x1 widget's content box, well under X/Y Charizard's 125x102 canvas. */
+        const val BOX = 48
     }
 }

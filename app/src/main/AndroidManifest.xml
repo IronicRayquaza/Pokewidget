@@ -50,6 +50,7 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.pokewidgets.app.ACTION_TAP" />
+                <action android:name="com.pokewidgets.app.ACTION_PINNED" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
@@ -63,6 +64,7 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.pokewidgets.app.ACTION_TAP" />
+                <action android:name="com.pokewidgets.app.ACTION_PINNED" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
@@ -76,6 +78,7 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.pokewidgets.app.ACTION_TAP" />
+                <action android:name="com.pokewidgets.app.ACTION_PINNED" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

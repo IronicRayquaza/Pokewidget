@@ -15,6 +15,7 @@ import com.pokewidgets.app.R
 import com.pokewidgets.app.catalog.CatalogRepository
 import com.pokewidgets.app.catalog.SpriteSet
 import com.pokewidgets.app.data.SpriteSource
+import com.pokewidgets.app.data.TapAction
 import com.pokewidgets.app.data.WidgetConfig
 import com.pokewidgets.app.data.WidgetConfigStore
 import com.pokewidgets.app.sprite.BitmapOps
@@ -52,6 +53,24 @@ class WidgetRenderer(private val context: Context) {
             statusViews(widgetId, config, "Couldn't load sprite")
         }
         updateSafely(manager, widgetId, views, config)
+        warmCry(config)
+    }
+
+    /**
+     * Downloads the cry now, while we are already doing network work and are under no
+     * deadline, so that the first tap does not have to.
+     *
+     * A tap is handled inside a broadcast receiver's window — roughly ten seconds — and
+     * on a cold cache it has to fetch, prepare and play inside it. That is a race the cry
+     * regularly lost, silently, which is a large part of why the widget seemed mute while
+     * the same Pokemon sounded fine in the app. Failure here is fine and ignored: the tap
+     * path still fetches for itself.
+     */
+    private suspend fun warmCry(config: WidgetConfig) {
+        if (!config.cryEnabled) return
+        if (config.tapAction != TapAction.CRY && config.tapAction != TapAction.EXCITE) return
+        runCatching { source.cryFile(config.pokemonId, config.legacyCry) }
+            .onFailure { Log.d(TAG, "could not pre-fetch a cry for " + config.pokemonId, it) }
     }
 
     /**
@@ -60,8 +79,9 @@ class WidgetRenderer(private val context: Context) {
      *
      * `requestPinAppWidget` carries no payload and does not run the configuration
      * activity, so without this every "Add Charizard to home screen" would land as the
-     * default Pikachu. Doing it here rather than in a pin-callback broadcast means it
-     * works regardless of whether a given launcher fires that callback at all.
+     * default Pikachu. Adopting the choice here, rather than only in the pin callback,
+     * means it survives whichever route the widget's first render arrives by — the
+     * callback, a resize, or the config activity.
      */
     private suspend fun resolveConfig(widgetId: Int): WidgetConfig {
         if (configStore.exists(widgetId)) return configStore.get(widgetId)
@@ -75,6 +95,13 @@ class WidgetRenderer(private val context: Context) {
      * throw here takes the launcher down with it. The planner budgets conservatively so
      * this should never fire — but "should never" is not a thing to bet someone's home
      * screen on, so re-plan against a halved budget and fall back to a still frame.
+     *
+     * The net is RuntimeException, not IllegalArgumentException. The bitmap ceiling is
+     * only one of the ways updateAppWidget can reject a payload — a recycled bitmap
+     * raises IllegalStateException, an oversized parcel a TransactionTooLargeException —
+     * and every one of those used to escape to WidgetUpdater's runCatching, where it was
+     * logged and forgotten while the widget sat on its placeholder forever. Anything that
+     * reaches here should end as a visible message, never as a blank square.
      */
     private suspend fun updateSafely(
         manager: AppWidgetManager,
@@ -84,8 +111,8 @@ class WidgetRenderer(private val context: Context) {
     ) {
         try {
             manager.updateAppWidget(widgetId, views)
-        } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "widget $widgetId exceeded the bitmap ceiling; retrying smaller", e)
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "widget $widgetId was rejected by the launcher; retrying smaller", e)
             val retry = runCatching {
                 buildViews(widgetId, config, manager.getAppWidgetOptions(widgetId), budgetScale = 0.35)
             }.getOrNull() ?: statusViews(widgetId, config, "Sprite too large")
@@ -203,7 +230,7 @@ class WidgetRenderer(private val context: Context) {
         val scaled = HashMap<Int, Bitmap>(plan.distinctFrames.size)
         for (index in plan.distinctFrames) {
             decoded.frames.getOrNull(index)?.let { frame ->
-                scaled[index] = BitmapOps.cropAndScale(frame, bounds, plan.scale)
+                scaled[index] = BitmapOps.cropScaleFit(frame, bounds, plan.scale, boxW, boxH)
             }
         }
 
@@ -255,7 +282,7 @@ class WidgetRenderer(private val context: Context) {
             targetHeightPx = boxH,
             maxScale = config.fill.maxScale,
         )
-        val natural = BitmapOps.cropAndScale(source, bounds, scale)
+        val natural = BitmapOps.cropScaleFit(source, bounds, scale, boxW, boxH)
 
         val frames = style.frames
         val shapes = frames.distinctBy { it.shapeKey }
@@ -269,7 +296,7 @@ class WidgetRenderer(private val context: Context) {
             perBitmap <= budget -> listOf(IdleFrame())
             else -> {
                 // Vanishingly unlikely at sprite sizes, but a still frame beats a crash.
-                addStill(views, BitmapOps.cropAndScale(source, bounds, 1))
+                addStill(views, BitmapOps.cropScaleFit(source, bounds, 1, boxW, boxH))
                 return
             }
         }

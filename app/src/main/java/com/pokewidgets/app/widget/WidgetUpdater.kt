@@ -12,6 +12,17 @@ import kotlinx.coroutines.launch
 
 object WidgetActions {
     const val ACTION_TAP = "com.pokewidgets.app.ACTION_TAP"
+
+    /**
+     * Fired by the launcher once it has actually placed a widget the app asked it to pin.
+     *
+     * Needed because a provider that declares an `android:configure` activity is not sent
+     * APPWIDGET_UPDATE when its widget is first placed — Android leaves the first render
+     * to the configuration activity, and `requestPinAppWidget` does not run one. Without
+     * this callback a widget added from inside the app is bound, never rendered, and sits
+     * on `widget_initial` forever: present on the home screen, showing no Pokemon.
+     */
+    const val ACTION_PINNED = "com.pokewidgets.app.ACTION_PINNED"
 }
 
 /**

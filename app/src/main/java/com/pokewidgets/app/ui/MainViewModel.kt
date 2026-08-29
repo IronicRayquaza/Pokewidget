@@ -1,8 +1,10 @@
 package com.pokewidgets.app.ui
 
 import android.app.Application
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
+import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pokewidgets.app.catalog.CatalogRepository
@@ -14,6 +16,7 @@ import com.pokewidgets.app.data.WidgetConfig
 import com.pokewidgets.app.data.WidgetConfigStore
 import com.pokewidgets.app.widget.CryPlayer
 import com.pokewidgets.app.widget.PokemonWidgetProvider
+import com.pokewidgets.app.widget.WidgetActions
 import com.pokewidgets.app.widget.WidgetRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -141,18 +144,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Plays a Pokémon's cry, cancelling whichever one was still sounding.
      *
-     * Silent mode is deliberately ignored here: unlike the widget, this is a sound the
-     * user asked for by tapping the Pokémon, and it goes out over the media stream.
+     * The widget's tap sounds exactly the same — see [CryPlayer], which no longer has an
+     * in-app flavour and a quieter home-screen one.
      */
     fun playCry(pokemonId: Int) {
         cryJob?.cancel()
         cryJob = viewModelScope.launch {
-            CryPlayer.play(
-                getApplication(),
-                pokemonId,
-                legacy = LEGACY_CRY,
-                respectSilentMode = false,
-            )
+            CryPlayer.play(getApplication(), pokemonId, legacy = LEGACY_CRY)
         }
     }
 
@@ -177,6 +175,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * Asks the launcher to place a widget directly, so the user never has to hunt through
      * the system widget tray. Supported since API 26; on launchers that decline, the
      * button is hidden rather than silently doing nothing.
+     *
+     * The success callback is not optional. These providers declare a configuration
+     * activity, which means Android deliberately withholds the first APPWIDGET_UPDATE and
+     * expects that activity to draw the widget — but a pinned widget never runs it. With
+     * no callback the widget is placed and then simply never rendered, which is why
+     * adding a Pokemon from inside the app produced an empty square on the home screen.
      */
     fun requestPin(pokemonId: Int, setId: String) {
         val context = getApplication<Application>()
@@ -189,7 +193,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             store.putPendingPin(WidgetConfig(pokemonId = pokemonId, setId = setId))
 
             val provider = ComponentName(context, PokemonWidgetProvider.Medium::class.java)
-            manager.requestPinAppWidget(provider, null, null)
+            val placed = PendingIntent.getBroadcast(
+                context,
+                PIN_CALLBACK_REQUEST,
+                Intent(context, PokemonWidgetProvider.Medium::class.java)
+                    .setAction(WidgetActions.ACTION_PINNED),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            manager.requestPinAppWidget(provider, null, placed)
         }
     }
 
@@ -233,5 +244,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
          * for the Pokémon that have no legacy recording.
          */
         const val LEGACY_CRY = true
+
+        /** Request code for the pin callback; distinct from any widget id. */
+        const val PIN_CALLBACK_REQUEST = 0x9101
     }
 }

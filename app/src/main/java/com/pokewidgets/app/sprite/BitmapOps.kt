@@ -6,6 +6,8 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /** Pixel-art safe bitmap helpers. Nothing here may ever apply bilinear filtering. */
 object BitmapOps {
@@ -92,7 +94,61 @@ object BitmapOps {
         return canonical.toList()
     }
 
-    /** Crops then upscales by an exact integer factor with nearest-neighbour sampling. */
+    /**
+     * Crops, upscales by an exact integer factor, then shrinks the result to fit the
+     * widget's content box when it is still larger than the box.
+     *
+     * The two directions want opposite treatment. Upscaling is integer-only and
+     * nearest-neighbour, because that is what keeps 8-bit art crisp. Downscaling only ever
+     * applies to the sets that overflow a widget in the first place — official artwork is
+     * a 475 px canvas holding 431x402 of actual art, Pokemon HOME is 512 px,
+     * Scarlet/Violet is 256 px — and those are high-resolution renders rather than pixel
+     * art, so they are resampled with filtering.
+     *
+     * Fitting has to happen here because the frame's ImageView is scaleType="center",
+     * which never shrinks anything: it clips. Without this, any Pokemon drawn larger than
+     * the widget lands on the home screen as a centre crop of its own torso — which is
+     * exactly why the artwork, HOME and Scarlet/Violet sets looked fine in the app and
+     * blank-to-unrecognisable in the widget.
+     *
+     * @param boxWidth the widget's content box width in pixels; 0 or less skips fitting.
+     * @param boxHeight likewise for height.
+     */
+    fun cropScaleFit(
+        source: Bitmap,
+        bounds: Rect,
+        scale: Int,
+        boxWidth: Int,
+        boxHeight: Int,
+    ): Bitmap {
+        val out = cropAndScale(source, bounds, scale)
+        if (boxWidth <= 0 || boxHeight <= 0) return out
+        if (out.width <= boxWidth && out.height <= boxHeight) return out
+
+        val ratio = min(boxWidth.toFloat() / out.width, boxHeight.toFloat() / out.height)
+        val fitted = Bitmap.createScaledBitmap(
+            out,
+            (out.width * ratio).roundToInt().coerceAtLeast(1),
+            (out.height * ratio).roundToInt().coerceAtLeast(1),
+            true,
+        )
+        if (out !== fitted) out.recycle()
+        return fitted
+    }
+
+    /**
+     * Crops then upscales by an exact integer factor with nearest-neighbour sampling.
+     *
+     * Always returns a bitmap distinct from [source]. That is a correctness requirement,
+     * not an optimisation: the renderer recycles the decoded source frames as soon as it
+     * has composed the RemoteViews, so handing one of them straight through leaves the
+     * launcher holding a recycled bitmap and `updateAppWidget` throws
+     * `IllegalStateException: Can't parcel a recycled bitmap` — the widget then never
+     * appears at all. It is reachable whenever a sprite's opaque content fills its whole
+     * canvas (X/Y and much of Scarlet/Violet ship pre-cropped) and the widget is too small
+     * to upscale it, because both `createBitmap` and `createScaledBitmap` return their
+     * argument unchanged when the transform is a no-op.
+     */
     fun cropAndScale(source: Bitmap, bounds: Rect, scale: Int): Bitmap {
         val cropped = if (bounds.left == 0 && bounds.top == 0 &&
             bounds.width() == source.width && bounds.height() == source.height
@@ -107,7 +163,10 @@ object BitmapOps {
                 bounds.height().coerceAtMost(source.height - bounds.top),
             )
         }
-        if (scale <= 1) return cropped
+        if (scale <= 1) {
+            return if (cropped === source) source.copy(source.config ?: Bitmap.Config.ARGB_8888, false)
+            else cropped
+        }
 
         // filter = false is the whole point: bilinear turns 8-bit art into mush.
         val scaled = Bitmap.createScaledBitmap(

@@ -44,7 +44,14 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
         this.widgetId = widgetId
         viewModelScope.launch {
             val all = catalog.pokemon()
-            val existing = if (store.exists(widgetId)) store.get(widgetId) else defaultConfig()
+            // Some launchers do run this activity for a widget pinned from the app. When
+            // they do, the Pokemon the user picked is still sitting in the pending slot,
+            // and starting from defaultConfig() would silently replace their choice with
+            // Pikachu.
+            val existing = when {
+                store.exists(widgetId) -> store.get(widgetId)
+                else -> store.takePendingPin() ?: defaultConfig()
+            }
             _state.update { it.copy(loading = false, allPokemon = all, config = existing) }
             refreshDerived()
         }

@@ -2,6 +2,7 @@ package com.pokewidgets.app.widget
 
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -59,10 +60,47 @@ sealed class PokemonWidgetProvider : AppWidgetProvider() {
             handleTap(context, intent)
             return
         }
-        // Everything else, including the newly-placed-widget update, goes through
-        // onUpdate — which renders via WidgetRenderer, where a pending pin choice from
-        // the app is picked up.
+        if (intent.action == WidgetActions.ACTION_PINNED) {
+            adoptPinned(context, goAsync())
+            return
+        }
+        // Everything else goes through onUpdate, which renders via WidgetRenderer. Note
+        // that a *newly placed* widget is not among them: a provider declaring an
+        // android:configure activity is deliberately sent no APPWIDGET_UPDATE on
+        // placement, which is what ACTION_PINNED above exists to cover.
         super.onReceive(context, intent)
+    }
+
+    /**
+     * Renders every placed widget that has no settings yet.
+     *
+     * This is the first render for a widget added by the app's "Add to home screen"
+     * button. Because these providers declare a configuration activity, the system sends
+     * no APPWIDGET_UPDATE for a freshly placed widget, and `requestPinAppWidget` does not
+     * launch that activity — so nothing else in the app would ever draw it, and the
+     * pending pin choice would never be consumed.
+     *
+     * The callback carries no widget id, so the new widget is found by elimination: it is
+     * the placed one the config store has never heard of. Rendering it runs
+     * [WidgetRenderer.resolveConfig], which adopts the Pokemon the user picked.
+     */
+    private fun adoptPinned(context: Context, pending: BroadcastReceiver.PendingResult) {
+        val appContext = context.applicationContext
+        scope.launch {
+            try {
+                val store = WidgetConfigStore(appContext)
+                val renderer = WidgetRenderer(appContext)
+                for (id in WidgetRenderer.allWidgetIds(appContext)) {
+                    if (store.exists(id)) continue
+                    runCatching { renderer.render(id) }
+                        .onFailure { Log.e(TAG, "could not render pinned widget $id", it) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "pin callback failed", e)
+            } finally {
+                pending.finish()
+            }
+        }
     }
 
     /**
