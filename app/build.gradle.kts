@@ -66,16 +66,34 @@ android {
     }
 
     /**
-     * Pins every `androidx.lifecycle` artifact to one version.
+     * Every pin below exists because this module is stuck on AGP 7.4.1, and each one is a
+     * splint rather than a fix. Deleting the whole block is the goal; the way there is to
+     * upgrade Android Studio and AGP, not to relax them one at a time.
      *
-     * Without this the module versions drift apart: we ask for lifecycle directly, but
-     * Compose Material3 also depends on `lifecycle-viewmodel-compose`, and Gradle's
-     * "highest wins" rule resolves that one transitively while leaving the others where
-     * we declared them. A newer `lifecycle-viewmodel-compose` calls
-     * `ViewModelProvider.Companion` — a field that only exists from 2.8.0, when the class
-     * was rewritten in Kotlin — so a split classpath compiles cleanly and then dies with
-     * `NoSuchFieldError` on the first composition that calls `viewModel()`. Aligning the
-     * whole group makes that failure mode unrepresentable rather than merely unlikely.
+     * **Never force a version below what a library on the classpath asks for.** A `force`
+     * outranks a dependency's own `requires`, silently, and the result compiles cleanly
+     * and then dies at runtime the first time the missing member is touched. This has now
+     * happened twice:
+     *
+     *  - `androidx.core:core` was forced to 1.12.0 while Compose Foundation 1.7.6
+     *    *requires* 1.13.1. Foundation's text field calls
+     *    `EditorInfoCompat.setStylusHandwritingEnabled`, which does not exist before
+     *    1.13.0, so focusing the search field threw `NoSuchMethodError`. There is no
+     *    force on core any more: Gradle resolves 1.13.1 on its own because Foundation
+     *    asks for it, and with nothing pinning it, it cannot drift below that again.
+     *  - `lifecycle` had the mirror-image problem: we asked for it directly while Compose
+     *    Material3 pulled `lifecycle-viewmodel-compose` transitively, and "highest wins"
+     *    lifted only that one. The newer module reads `ViewModelProvider.Companion`, a
+     *    field that only exists from 2.8.0, so a split classpath died with
+     *    `NoSuchFieldError` on the first `viewModel()` call. Aligning the group makes
+     *    that unrepresentable.
+     *
+     * The remaining pins are load-bearing for the *build*, not the runtime: AGP 7.4.1's
+     * D8 throws `NullPointerException` while dexing `vectordrawable` 1.2.0,
+     * `vectordrawable-animated` 1.2.0 and `profileinstaller` 1.4.1. Each is held at the
+     * version its own consumer declares — Compose UI 1.7.6 requires exactly
+     * `profileinstaller:1.3.1`, AppCompat 1.6.1 shipped against `vectordrawable:1.1.0` —
+     * so none of them is pinned below a stated requirement.
      */
     configurations.all {
         resolutionStrategy {
@@ -83,8 +101,6 @@ android {
             force("androidx.appcompat:appcompat-resources:1.6.1")
             force("androidx.activity:activity:1.8.2")
             force("androidx.activity:activity-compose:1.8.2")
-            force("androidx.core:core-ktx:1.12.0")
-            force("androidx.core:core:1.12.0")
             force("androidx.profileinstaller:profileinstaller:1.3.1")
             force("androidx.vectordrawable:vectordrawable:1.1.0")
             force("androidx.vectordrawable:vectordrawable-animated:1.1.0")
