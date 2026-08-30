@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
@@ -14,16 +15,23 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pokewidgets.app.ui.screens.MainScreen
+import com.pokewidgets.app.ui.theme.Paper
 import com.pokewidgets.app.ui.theme.PokeWidgetTheme
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // The app is light on every screen, so the system bars are asked for dark icons
+        // once here rather than being left to follow the device theme and disappear into
+        // the cream stock on a phone set to dark mode.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
         setContent {
             PokeWidgetTheme {
-                Surface {
+                Surface(color = Paper) {
                     val viewModel: MainViewModel = viewModel()
                     val state by viewModel.state.collectAsState()
 

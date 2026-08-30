@@ -2,8 +2,8 @@ package com.pokewidgets.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,102 +16,89 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.pokewidgets.app.catalog.SpriteSet
 import com.pokewidgets.app.data.Fill
 import com.pokewidgets.app.data.Smoothness
-import com.pokewidgets.app.sprite.IdleStyle
 import com.pokewidgets.app.data.TapAction
 import com.pokewidgets.app.data.WidgetConfig
+import com.pokewidgets.app.sprite.IdleStyle
 import com.pokewidgets.app.ui.ConfigUiState
+import com.pokewidgets.app.ui.components.Caption
+import com.pokewidgets.app.ui.components.PokeButton
+import com.pokewidgets.app.ui.components.PokeChip
+import com.pokewidgets.app.ui.components.PokeHeader
 import com.pokewidgets.app.ui.components.PokemonIcon
+import com.pokewidgets.app.ui.components.SectionHeader
 import com.pokewidgets.app.ui.components.SpriteImage
-import com.pokewidgets.app.ui.theme.GbaScreen
-import com.pokewidgets.app.ui.theme.GbaScreenDark
-import com.pokewidgets.app.ui.theme.typeColor
+import com.pokewidgets.app.ui.components.SpriteStage
+import com.pokewidgets.app.ui.components.TypeChip
+import com.pokewidgets.app.ui.components.pressScale
+import com.pokewidgets.app.ui.theme.Chalk
+import com.pokewidgets.app.ui.theme.Ink
+import com.pokewidgets.app.ui.theme.Lime
+import com.pokewidgets.app.ui.theme.PokeRed
+import com.pokewidgets.app.ui.theme.Paper
+import com.pokewidgets.app.ui.theme.dottedPaper
+import com.pokewidgets.app.ui.theme.sticker
+import com.pokewidgets.app.ui.theme.topRule
+import com.pokewidgets.app.ui.theme.Card as CardColor
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConfigScreen(
     state: ConfigUiState,
     onPickPokemon: () -> Unit,
-    onSelectSet: (String) -> Unit,
+    onPickSet: () -> Unit,
     onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit,
     onSave: () -> Unit,
 ) {
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("Set up widget") }) },
-        bottomBar = {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-                    // Edge-to-edge is on, so the bar would otherwise sit under the
-                    // system navigation and the Save button would be unreachable.
-                    .navigationBarsPadding()
-                    .padding(16.dp),
-            ) {
-                Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Check, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Add to home screen")
-                }
-            }
-        },
-    ) { padding ->
+    Column(
+        Modifier
+            .fillMaxSize()
+            .dottedPaper()
+            .statusBarsPadding(),
+    ) {
+        PokeHeader("Set up widget")
+
         Column(
             Modifier
-                .fillMaxSize()
-                .padding(padding)
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Spacer(Modifier.height(4.dp))
-
             PreviewPanel(state)
 
-            SectionHeader("Pokémon")
-            PokemonRow(state, onPickPokemon)
-
-            SectionHeader("Sprite set")
-            SetPicker(state, onSelectSet)
-
-            state.warning?.let { warning ->
-                Text(
-                    warning,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
+            Panel {
+                SectionHeader("Pokémon")
+                PokemonRow(state, onPickPokemon)
+                Spacer(Modifier.height(16.dp))
+                SectionHeader("Sprite set")
+                SetRow(state, onPickSet)
+                state.warning?.let {
+                    Spacer(Modifier.height(10.dp))
+                    Caption(it, color = MaterialTheme.colorScheme.error)
+                }
             }
 
             VariantSection(state, onUpdate)
@@ -119,33 +106,59 @@ fun ConfigScreen(
             AnimationSection(state, onUpdate)
             InteractionSection(state, onUpdate)
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(8.dp))
+        }
+
+        // Edge-to-edge is on, so without the navigation-bar inset the Save button would
+        // sit under the system gesture area and be unreachable.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(Paper)
+                .topRule()
+                .navigationBarsPadding()
+                .padding(16.dp),
+        ) {
+            PokeButton(
+                text = "Add to home screen",
+                onClick = onSave,
+                icon = Icons.Default.Check,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
 
-/** A GBA screen the sprite sits on, previewing the real background settings. */
+/** A settings group. One outlined card per topic, so the page reads as a stack of cards. */
+@Composable
+private fun Panel(content: @Composable () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .sticker(shape = MaterialTheme.shapes.medium, fill = CardColor, lift = 4.dp)
+            .padding(16.dp),
+    ) {
+        content()
+    }
+}
+
+/** The sprite standing on its plate, previewing the real background settings. */
 @Composable
 private fun PreviewPanel(state: ConfigUiState) {
     val config = state.config
-    Box(
-        Modifier
+    SpriteStage(
+        modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(GbaScreenDark, GbaScreen)),
-            )
-            .border(3.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(18.dp)),
-        contentAlignment = Alignment.Center,
+            .height(230.dp),
+        ballFraction = 0.76f,
     ) {
         Box(
             Modifier
-                .size(180.dp)
+                .fillMaxSize()
                 .then(
                     if (config.showBackground) {
                         Modifier
-                            .clip(RoundedCornerShape(config.cornerRadiusDp.dp))
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(config.cornerRadiusDp.dp))
                             .background(Color(config.backgroundColor))
                     } else {
                         Modifier
@@ -156,7 +169,7 @@ private fun PreviewPanel(state: ConfigUiState) {
             SpriteImage(
                 url = state.previewUrl,
                 contentDescription = state.entry?.displayName,
-                modifier = Modifier.size(160.dp),
+                modifier = Modifier.fillMaxSize().padding(12.dp),
             )
         }
     }
@@ -164,107 +177,90 @@ private fun PreviewPanel(state: ConfigUiState) {
 
 @Composable
 private fun PokemonRow(state: ConfigUiState, onPick: () -> Unit) {
-    Card(
-        onClick = onPick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        Row(
-            Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            PokemonIcon(state.config.pokemonId, null, size = 48.dp)
-            Column(Modifier.weight(1f)) {
-                Text(
-                    state.entry?.displayName ?: "Choose a Pokémon",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    state.entry?.types?.forEach { TypeChip(it) }
-                }
-            }
-            Text("Change", style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-@Composable
-fun TypeChip(type: String) {
-    Box(
+    val interactions = remember { MutableInteractionSource() }
+    Row(
         Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(typeColor(type))
-            .padding(horizontal = 6.dp, vertical = 3.dp),
+            .fillMaxWidth()
+            .pressScale(interactions)
+            .sticker(shape = MaterialTheme.shapes.small, fill = Chalk, lift = 3.dp)
+            .clickable(interactionSource = interactions, indication = null, onClick = onPick)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            type.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-        )
-    }
-}
-
-@Composable
-private fun SetPicker(state: ConfigUiState, onSelect: (String) -> Unit) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(vertical = 2.dp),
-    ) {
-        items(state.availableSets, key = { it.id }) { set ->
-            SetCard(set, selected = set.id == state.config.setId) { onSelect(set.id) }
+        PokemonIcon(state.config.pokemonId, null, size = 48.dp)
+        Column(Modifier.weight(1f)) {
+            Text(
+                state.entry?.displayName ?: "Choose a Pokémon",
+                style = MaterialTheme.typography.titleMedium,
+                color = Ink,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                state.entry?.types?.forEach { TypeChip(it) }
+            }
         }
+        Text("CHANGE", style = MaterialTheme.typography.labelSmall, color = PokeRed)
     }
 }
 
+/**
+ * The chosen sprite set, and the way into the full grid of alternatives.
+ *
+ * The grid used to be a horizontally-scrolling strip right here, which showed two of a
+ * possible twenty sets and made comparing them a matter of memory. It is now its own page.
+ */
 @Composable
-private fun SetCard(set: SpriteSet, selected: Boolean, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .width(150.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
+private fun SetRow(state: ConfigUiState, onPick: () -> Unit) {
+    val interactions = remember { MutableInteractionSource() }
+    val set = state.selectedSet
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .pressScale(interactions)
+            .sticker(shape = MaterialTheme.shapes.small, fill = Chalk, lift = 3.dp)
+            .clickable(interactionSource = interactions, indication = null, onClick = onPick)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(Modifier.padding(12.dp)) {
+        SpriteStage(
+            modifier = Modifier.size(56.dp),
+            shape = MaterialTheme.shapes.extraSmall,
+            borderWidth = 2.dp,
+            lift = 0.dp,
+            ballFraction = 0.7f,
+            inset = 5.dp,
+        ) {
+            SpriteImage(state.previewUrl, set?.label, Modifier.fillMaxSize())
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                set?.label ?: "Choose a sprite set",
+                style = MaterialTheme.typography.titleMedium,
+                color = Ink,
+            )
+            Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // The badge is the point of the whole picker: it tells you at a glance
-                // which of these will actually move on your home screen.
-                if (set.animated) {
-                    Icon(
+                Caption(set?.hardware ?: "—")
+                if (set?.animated == true) {
+                    Spacer(Modifier.width(8.dp))
+                    androidx.compose.material3.Icon(
                         Icons.Default.PlayArrow,
                         contentDescription = "Animated",
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = PokeRed,
+                        modifier = Modifier.size(12.dp),
                     )
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Caption("animated", color = PokeRed)
                 }
-                Text(
-                    set.label,
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 2,
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                set.hardware,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (!set.animated) {
-                Text(
-                    "still · generated idle",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
+        Text(
+            (state.availableSets.size).toString() + " SETS",
+            style = MaterialTheme.typography.labelSmall,
+            color = PokeRed,
+        )
     }
 }
 
@@ -277,29 +273,17 @@ private fun VariantSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> Wi
     val canFemale = set.supports(c.back, c.shiny, true, c.style)
     if (!canShiny && !canBack && !canFemale) return
 
-    Column {
+    Panel {
         SectionHeader("Variant")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (canShiny) {
-                FilterChip(
-                    selected = c.shiny,
-                    onClick = { onUpdate { it.copy(shiny = !it.shiny) } },
-                    label = { Text("Shiny") },
-                )
+                PokeChip("Shiny", c.shiny, { onUpdate { it.copy(shiny = !it.shiny) } })
             }
             if (canBack) {
-                FilterChip(
-                    selected = c.back,
-                    onClick = { onUpdate { it.copy(back = !it.back) } },
-                    label = { Text("Back") },
-                )
+                PokeChip("Back", c.back, { onUpdate { it.copy(back = !it.back) } })
             }
             if (canFemale) {
-                FilterChip(
-                    selected = c.female,
-                    onClick = { onUpdate { it.copy(female = !it.female) } },
-                    label = { Text("Female") },
-                )
+                PokeChip("Female", c.female, { onUpdate { it.copy(female = !it.female) } })
             }
         }
     }
@@ -317,46 +301,57 @@ private val BACKGROUND_SWATCHES = listOf(
 @Composable
 private fun AppearanceSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit) {
     val c = state.config
-    Column {
+    Panel {
         SectionHeader("Background")
         SettingRow(
             title = "Show a background",
             subtitle = "Off means the sprite floats on your wallpaper",
         ) {
-            Switch(
-                checked = c.showBackground,
-                onCheckedChange = { on -> onUpdate { it.copy(showBackground = on) } },
-            )
+            PokeSwitch(c.showBackground) { on -> onUpdate { it.copy(showBackground = on) } }
         }
         AnimatedVisibility(visible = c.showBackground) {
             Column {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     BACKGROUND_SWATCHES.forEach { color ->
+                        val chosen = c.backgroundColor == color
                         Box(
                             Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(color))
-                                .border(
-                                    width = if (c.backgroundColor == color) 3.dp else 1.dp,
-                                    color = if (c.backgroundColor == color) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.outlineVariant
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
+                                .size(40.dp)
+                                .sticker(
+                                    shape = MaterialTheme.shapes.extraSmall,
+                                    fill = Color(color),
+                                    borderWidth = if (chosen) 3.dp else 2.dp,
+                                    lift = if (chosen) 4.dp else 2.dp,
                                 )
                                 .clickable { onUpdate { it.copy(backgroundColor = color) } },
-                        )
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            // Selection needs a shape as well as a thicker keyline: six
+                            // swatches differing only in outline weight is a difference
+                            // nobody spots.
+                            if (chosen) {
+                                androidx.compose.material3.Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                Text("Corner radius · ${c.cornerRadiusDp}dp", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(16.dp))
+                Caption("Corner radius · " + c.cornerRadiusDp + "dp")
                 Slider(
                     value = c.cornerRadiusDp.toFloat(),
                     onValueChange = { v -> onUpdate { it.copy(cornerRadiusDp = v.toInt()) } },
                     valueRange = 0f..48f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = Ink,
+                        activeTrackColor = PokeRed,
+                        inactiveTrackColor = Chalk,
+                    ),
                 )
             }
         }
@@ -366,7 +361,7 @@ private fun AppearanceSection(state: ConfigUiState, onUpdate: ((WidgetConfig) ->
 @Composable
 private fun AnimationSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit) {
     val c = state.config
-    Column {
+    Panel {
         SectionHeader("Animation")
         OptionRow(
             options = Smoothness.entries,
@@ -374,19 +369,18 @@ private fun AnimationSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> 
             label = { it.label },
             onSelect = { s -> onUpdate { it.copy(smoothness = s) } },
         )
-        Spacer(Modifier.height(6.dp))
-        Text(
+        Spacer(Modifier.height(10.dp))
+        Caption(
             "Home-screen widgets have a fixed memory ceiling. Large sprites on large " +
-                "widgets may animate a little slower than requested so the launcher stays stable.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                "widgets may animate a little slower than requested so the launcher stays " +
+                "stable.",
         )
 
         // Only meaningful for still art. Showing it against Black/White or Showdown would
         // offer a choice that changes nothing.
         AnimatedVisibility(visible = state.selectedSet?.animated == false) {
             Column {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
                 SectionHeader("Idle movement")
                 OptionRow(
                     options = IdleStyle.entries,
@@ -394,18 +388,16 @@ private fun AnimationSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> 
                     label = { it.label },
                     onSelect = { s -> onUpdate { it.copy(idleStyle = s) } },
                 )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "${c.idleStyle.description}. ${state.selectedSet?.label ?: "This set"} " +
-                        "ships as still images — its real in-game animation only exists " +
+                Spacer(Modifier.height(10.dp))
+                Caption(
+                    c.idleStyle.description + ". " + (state.selectedSet?.label ?: "This set") +
+                        " ships as still images — its real in-game animation only exists " +
                         "inside the ROM, so PokéWidget generates the movement instead.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
         SectionHeader("Sprite size")
         OptionRow(
             options = Fill.entries,
@@ -419,7 +411,7 @@ private fun AnimationSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> 
 @Composable
 private fun InteractionSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit) {
     val c = state.config
-    Column {
+    Panel {
         SectionHeader("When tapped")
         OptionRow(
             options = TapAction.entries,
@@ -427,35 +419,31 @@ private fun InteractionSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -
             label = { it.label },
             onSelect = { a -> onUpdate { it.copy(tapAction = a) } },
         )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            c.tapAction.description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Spacer(Modifier.height(10.dp))
+        Caption(c.tapAction.description)
 
         AnimatedVisibility(visible = c.tapAction == TapAction.CRY || c.tapAction == TapAction.EXCITE) {
             Column {
-                Spacer(Modifier.height(12.dp))
-                SettingRow(title = "Play the cry", subtitle = "Stays silent when your phone is on silent") {
-                    Switch(
-                        checked = c.cryEnabled,
-                        onCheckedChange = { on -> onUpdate { it.copy(cryEnabled = on) } },
-                    )
+                Spacer(Modifier.height(16.dp))
+                SettingRow(
+                    title = "Play the cry",
+                    subtitle = "Silent while your media volume is muted",
+                ) {
+                    PokeSwitch(c.cryEnabled) { on -> onUpdate { it.copy(cryEnabled = on) } }
                 }
                 AnimatedVisibility(visible = c.cryEnabled) {
                     Column {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(
-                                selected = c.legacyCry,
-                                onClick = { onUpdate { it.copy(legacyCry = true) } },
-                                label = { Text("Game Boy cry") },
+                            PokeChip(
+                                "Game Boy cry",
+                                c.legacyCry,
+                                { onUpdate { it.copy(legacyCry = true) } },
                             )
-                            FilterChip(
-                                selected = !c.legacyCry,
-                                onClick = { onUpdate { it.copy(legacyCry = false) } },
-                                label = { Text("Modern cry") },
+                            PokeChip(
+                                "Modern cry",
+                                !c.legacyCry,
+                                { onUpdate { it.copy(legacyCry = false) } },
                             )
                         }
                     }
@@ -468,31 +456,32 @@ private fun InteractionSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -
 // ---- Small shared pieces --------------------------------------------------------
 
 @Composable
-fun SectionHeader(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(bottom = 8.dp),
+private fun PokeSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = Ink,
+            checkedTrackColor = Lime,
+            checkedBorderColor = Ink,
+            uncheckedThumbColor = Ink,
+            uncheckedTrackColor = CardColor,
+            uncheckedBorderColor = Ink,
+        ),
     )
 }
 
 @Composable
 private fun SettingRow(title: String, subtitle: String?, control: @Composable () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = Ink)
             subtitle?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Spacer(Modifier.height(2.dp))
+                Caption(it)
             }
         }
+        Spacer(Modifier.width(12.dp))
         control()
     }
 }
@@ -504,31 +493,13 @@ private fun <T> OptionRow(
     label: (T) -> String,
     onSelect: (T) -> Unit,
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(vertical = 4.dp),
+    ) {
         items(options.size) { index ->
             val option = options[index]
-            FilterChip(
-                selected = option == selected,
-                onClick = { onSelect(option) },
-                label = { Text(label(option), textAlign = TextAlign.Center) },
-            )
+            PokeChip(label(option), option == selected, { onSelect(option) })
         }
     }
-}
-
-@Composable
-fun EmptyHint(text: String) {
-    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    OutlinedButton(onClick = onClick, modifier = modifier) { Text(text) }
 }

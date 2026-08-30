@@ -8,36 +8,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.ripple
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,19 +34,37 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pokewidgets.app.catalog.PokemonEntry
 import com.pokewidgets.app.ui.MainUiState
 import com.pokewidgets.app.ui.PlacedWidget
-import com.pokewidgets.app.ui.SetPreview
+import com.pokewidgets.app.ui.components.Caption
+import com.pokewidgets.app.ui.components.EmptyHint
+import com.pokewidgets.app.ui.components.PokeButton
+import com.pokewidgets.app.ui.components.PokeChip
+import com.pokewidgets.app.ui.components.PokeIconButton
+import com.pokewidgets.app.ui.components.PokeSearchField
 import com.pokewidgets.app.ui.components.PokemonIcon
-import com.pokewidgets.app.ui.components.cryHop
+import com.pokewidgets.app.ui.components.SectionHeader
+import com.pokewidgets.app.ui.components.SpriteStage
 import com.pokewidgets.app.ui.components.pressScale
-import com.pokewidgets.app.ui.components.SpriteImage
+import com.pokewidgets.app.ui.theme.Ink
+import com.pokewidgets.app.ui.theme.InkSoft
+import com.pokewidgets.app.ui.theme.Lime
+import com.pokewidgets.app.ui.theme.Sky
+import com.pokewidgets.app.ui.theme.dottedPaper
+import com.pokewidgets.app.ui.theme.sticker
+import com.pokewidgets.app.ui.theme.Card as CardColor
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The app's home: search every Pokémon, see what is already on the home screen, open one
+ * to choose its art.
+ *
+ * Both of the screens that used to be modal bottom sheets — a Pokémon's sprite sets and
+ * the settings — are now full pages. Sheets dismiss on a downward drag, which is the same
+ * gesture as scrolling their contents, and both of these are things the user scrolls.
+ */
 @Composable
 fun MainScreen(
     state: MainUiState,
@@ -72,367 +79,265 @@ fun MainScreen(
     onPlayCry: (Int) -> Unit,
 ) {
     var showSettings by remember { mutableStateOf(false) }
+    val detail = state.detail
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("PokéWidget") },
-                actions = {
-                    androidx.compose.material3.IconButton(onClick = { showSettings = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
+    when {
+        detail != null -> PokemonDetailScreen(
+            entry = detail,
+            sets = state.detailSets,
+            canPin = state.canPin,
+            onBack = onCloseDetail,
+            onPin = onPin,
+            onPlayCry = onPlayCry,
+        )
+
+        showSettings -> SettingsScreen(
+            cacheBytes = state.cacheBytes,
+            onClearCache = onClearCache,
+            onBack = { showSettings = false },
+        )
+
+        else -> BrowseScreen(
+            state = state,
+            onQuery = onQuery,
+            onGeneration = onGeneration,
+            onAnimatedOnly = onAnimatedOnly,
+            onOpenDetail = onOpenDetail,
+            onEditWidget = onEditWidget,
+            onOpenSettings = { showSettings = true },
+        )
+    }
+}
+
+@Composable
+private fun BrowseScreen(
+    state: MainUiState,
+    onQuery: (String) -> Unit,
+    onGeneration: (Int?) -> Unit,
+    onAnimatedOnly: (Boolean) -> Unit,
+    onOpenDetail: (PokemonEntry) -> Unit,
+    onEditWidget: (Int) -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .dottedPaper()
+            .statusBarsPadding(),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("PokéWidget", style = MaterialTheme.typography.headlineMedium, color = Ink)
+                Spacer(Modifier.height(6.dp))
+                Caption("Put a Pokémon on your home screen")
+            }
+            PokeIconButton(Icons.Default.Settings, "Settings", onOpenSettings)
+        }
+
+        if (state.placed.isNotEmpty()) {
+            PlacedWidgetsRow(state.placed, onEditWidget)
+        }
+
+        PokeSearchField(
+            value = state.query,
+            onValueChange = onQuery,
+            placeholder = "Search 1,345 Pokémon and forms",
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item {
+                PokeChip(
+                    label = "Animated",
+                    selected = state.animatedOnly,
+                    onClick = { onAnimatedOnly(!state.animatedOnly) },
+                    icon = Icons.Default.PlayArrow,
+                )
+            }
+            item {
+                PokeChip(
+                    label = "All gens",
+                    selected = state.generation == null,
+                    onClick = { onGeneration(null) },
+                )
+            }
+            items((1..9).toList()) { gen ->
+                PokeChip(
+                    label = "Gen $gen",
+                    selected = state.generation == gen,
+                    onClick = { onGeneration(if (state.generation == gen) null else gen) },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        when {
+            state.loading -> LoadingGrid()
+
+            state.results.isEmpty() -> EmptyHint(
+                title = "Nothing matches that",
+                detail = if (state.query.isBlank()) {
+                    "No Pokémon in this generation has an animated sprite set."
+                } else {
+                    "No Pokémon called “" + state.query + "” — try a dex number, or clear the filters."
+                },
+                action = {
+                    PokeButton(
+                        text = "Clear filters",
+                        onClick = {
+                            onQuery("")
+                            onGeneration(null)
+                            onAnimatedOnly(false)
+                        },
+                        container = CardColor,
+                    )
                 },
             )
-        },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
 
-            if (state.placed.isNotEmpty()) {
-                PlacedWidgetsRow(state.placed, onEditWidget)
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            }
-
-            OutlinedTextField(
-                value = state.query,
-                onValueChange = onQuery,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                placeholder = { Text("Search 1,345 Pokémon and forms") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true,
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            else -> LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 116.dp),
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.navigationBarsPadding(),
             ) {
-                item {
-                    FilterChip(
-                        selected = state.animatedOnly,
-                        onClick = { onAnimatedOnly(!state.animatedOnly) },
-                        label = { Text("Animated only") },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        },
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = state.generation == null,
-                        onClick = { onGeneration(null) },
-                        label = { Text("All gens") },
-                    )
-                }
-                items((1..9).toList()) { gen ->
-                    FilterChip(
-                        selected = state.generation == gen,
-                        onClick = { onGeneration(if (state.generation == gen) null else gen) },
-                        label = { Text("Gen $gen") },
-                    )
+                items(state.results, key = { it.id }) { entry ->
+                    PokemonCell(entry, selected = false) { onOpenDetail(entry) }
                 }
             }
-
-            Spacer(Modifier.height(10.dp))
-
-            when {
-                state.loading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-
-                state.results.isEmpty() -> EmptyHint("Nothing matches that search.")
-
-                else -> LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 104.dp),
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(state.results, key = { it.id }) { entry ->
-                        val interactions = remember { MutableInteractionSource() }
-                        Card(
-                            modifier = Modifier
-                                .pressScale(interactions)
-                                .clickable(
-                                    interactionSource = interactions,
-                                    indication = ripple(),
-                                ) { onOpenDetail(entry) },
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            ),
-                        ) {
-                            Column(
-                                Modifier.fillMaxWidth().padding(8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                PokemonIcon(entry.id, entry.displayName, size = 56.dp)
-                                Text(
-                                    entry.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                entry.form?.let {
-                                    Text(
-                                        it,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    state.detail?.let { entry ->
-        ModalBottomSheet(onDismissRequest = onCloseDetail) {
-            DetailSheet(entry, state.detailSets, state.canPin, onPin, onPlayCry)
-        }
-    }
-
-    if (showSettings) {
-        ModalBottomSheet(onDismissRequest = { showSettings = false }) {
-            SettingsSheet(state.cacheBytes, onClearCache)
         }
     }
 }
 
 /**
- * Every sprite set that can render this Pokémon, previewed live side by side — the
- * closest thing the app has to the reference sprite gallery, and the fastest way to see
- * which game's art you actually want on your home screen.
- */
-@Composable
-private fun DetailSheet(
-    entry: PokemonEntry,
-    sets: List<SetPreview>,
-    canPin: Boolean,
-    onPin: (Int, String) -> Unit,
-    onPlayCry: (Int) -> Unit,
-) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
-        Text(entry.displayName, style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            entry.types.forEach { TypeChip(it) }
-            Spacer(Modifier.width(4.dp))
-            Text(
-                "#${entry.dexNumber} · Gen ${entry.generation}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        HeroSprite(entry, sets, onPlayCry)
-
-        Spacer(Modifier.height(16.dp))
-
-        if (sets.isEmpty()) {
-            Box(Modifier.fillMaxWidth().height(120.dp), Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            SectionHeader("${sets.size} sprite sets available")
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(sets, key = { it.set.id }) { preview ->
-                    Column(
-                        Modifier.width(120.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Box(
-                            Modifier
-                                .size(104.dp)
-                                .clickable { onPin(entry.id, preview.set.id) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            SpriteImage(preview.url, preview.set.label, Modifier.fillMaxSize())
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (preview.set.animated) {
-                                Icon(
-                                    Icons.Default.PlayArrow,
-                                    contentDescription = "Animated",
-                                    modifier = Modifier.size(12.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                            Text(
-                                preview.set.label,
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Text(
-                            preview.set.hardware,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-        if (canPin) {
-            val best = sets.firstOrNull { it.set.animated } ?: sets.firstOrNull()
-            SecondaryButton(
-                text = "Add ${entry.name} to home screen",
-                onClick = { best?.let { onPin(entry.id, it.set.id) } },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else {
-            Text(
-                "Long-press your home screen and pick PokéWidget from the widget list.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/**
- * The Pokémon itself, big, animated, and tappable.
+ * One Pokémon in the browse grid.
  *
- * This is the answer to "tapping a Pokémon does nothing": every tap replays the cry and
- * plays a squash-and-stretch hop, so the gesture lands even with the volume down. It
- * prefers an animated set so the sprite is already moving before it is touched.
+ * Shared with the widget's own Pokémon picker so the two grids cannot drift apart — this
+ * is the cell the user learns on the first screen and meets again while configuring.
  */
 @Composable
-private fun HeroSprite(
-    entry: PokemonEntry,
-    sets: List<SetPreview>,
-    onPlayCry: (Int) -> Unit,
-) {
-    // Counts taps rather than tracking a boolean, so holding the sprite down and tapping
-    // repeatedly restarts the hop each time instead of only toggling it.
-    var hops by remember(entry.id) { mutableStateOf(0) }
+fun PokemonCell(entry: PokemonEntry, selected: Boolean, onClick: () -> Unit) {
     val interactions = remember { MutableInteractionSource() }
-    val hero = remember(sets) { sets.firstOrNull { it.set.animated } ?: sets.firstOrNull() }
-
-    Box(
+    val fill = if (selected) Lime else CardColor
+    Column(
         Modifier
-            .fillMaxWidth()
-            .height(148.dp)
-            .clickable(
-                interactionSource = interactions,
-                indication = null,
-            ) {
-                hops++
-                onPlayCry(entry.id)
-            },
-        contentAlignment = Alignment.Center,
+            .pressScale(interactions)
+            .sticker(
+                shape = MaterialTheme.shapes.medium,
+                fill = fill,
+                borderWidth = if (selected) 3.dp else 2.dp,
+                lift = if (selected) 5.dp else 3.dp,
+            )
+            .clickable(interactionSource = interactions, indication = null, onClick = onClick)
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (hero == null) {
-            PokemonIcon(entry.id, entry.displayName, size = 96.dp)
-        } else {
-            SpriteImage(
-                hero.url,
-                entry.displayName,
+        SpriteStage(
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            fill = Sky,
+            shape = MaterialTheme.shapes.small,
+            borderWidth = 2.dp,
+            lift = 0.dp,
+            ballFraction = 0.66f,
+            inset = 8.dp,
+        ) {
+            PokemonIcon(entry.id, entry.displayName, size = 64.dp)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            entry.name,
+            style = MaterialTheme.typography.labelMedium,
+            color = Ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            entry.form ?: ("#" + entry.dexNumber.toString().padStart(3, '0')),
+            style = MaterialTheme.typography.bodySmall,
+            color = InkSoft,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(2.dp))
+    }
+}
+
+/** Skeleton cells while the bundled catalog is still being parsed off the main thread. */
+@Composable
+private fun LoadingGrid() {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 116.dp),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        userScrollEnabled = false,
+    ) {
+        items(12) {
+            Box(
                 Modifier
-                    .fillMaxSize()
-                    .pressScale(interactions, pressedScale = 0.94f)
-                    .cryHop(hops),
+                    .fillMaxWidth()
+                    .aspectRatio(0.8f)
+                    .sticker(
+                        shape = MaterialTheme.shapes.medium,
+                        fill = com.pokewidgets.app.ui.theme.Chalk,
+                        borderWidth = 2.dp,
+                        lift = 3.dp,
+                    ),
             )
         }
     }
-    Text(
-        "Tap to hear the cry",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth(),
-        textAlign = TextAlign.Center,
-    )
 }
 
+/** The widgets already on the home screen, as a shortcut back into their settings. */
 @Composable
 private fun PlacedWidgetsRow(placed: List<PlacedWidget>, onEdit: (Int) -> Unit) {
     Column {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "On your home screen",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        Spacer(Modifier.height(8.dp))
+        SectionHeader("On your home screen", Modifier.padding(horizontal = 16.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(placed, key = { it.widgetId }) { widget ->
-                Card(
-                    modifier = Modifier.clickable { onEdit(widget.widgetId) },
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
+                val interactions = remember { MutableInteractionSource() }
+                Row(
+                    Modifier
+                        .pressScale(interactions)
+                        .sticker(shape = MaterialTheme.shapes.small, fill = CardColor, lift = 3.dp)
+                        .clickable(
+                            interactionSource = interactions,
+                            indication = null,
+                        ) { onEdit(widget.widgetId) }
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Row(
-                        Modifier.padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        PokemonIcon(widget.config.pokemonId, null, size = 36.dp)
-                        Column {
-                            Text(
-                                widget.entry?.name ?: "Widget ${widget.widgetId}",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Text(
-                                widget.set?.label ?: "—",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                    PokemonIcon(widget.config.pokemonId, null, size = 36.dp)
+                    Column {
+                        Text(
+                            widget.entry?.name ?: ("Widget " + widget.widgetId),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Ink,
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Caption(widget.set?.label ?: "—")
                     }
+                    Spacer(Modifier.width(2.dp))
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SettingsSheet(cacheBytes: Long, onClearCache: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(20.dp).padding(bottom = 28.dp)) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(20.dp))
-
-        SectionHeader("Sprite cache")
-        Text(
-            "%.1f MB of sprites and cries stored on this device.".format(cacheBytes / 1_048_576.0),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Sprites download once and are kept forever — every URL is pinned to a fixed " +
-                "revision, so a cached sprite can never go stale. Your widgets keep " +
-                "animating with no connection.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(10.dp))
-        TextButton(onClick = onClearCache) { Text("Clear cache") }
-
-        Spacer(Modifier.height(20.dp))
-        SectionHeader("Credits")
-        Text(
-            "Sprites and cries come from the community PokéAPI mirrors. Pokémon and all " +
-                "related art are trademarks of Nintendo, Creatures Inc. and GAME FREAK inc. " +
-                "This is an unofficial fan project with no affiliation.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Spacer(Modifier.height(14.dp))
     }
 }

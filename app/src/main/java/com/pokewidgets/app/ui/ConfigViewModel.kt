@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pokewidgets.app.catalog.CatalogRepository
 import com.pokewidgets.app.catalog.PokemonEntry
+import com.pokewidgets.app.catalog.SpriteKey
 import com.pokewidgets.app.catalog.SpriteSet
 import com.pokewidgets.app.data.SpriteSource
 import com.pokewidgets.app.data.WidgetConfig
@@ -22,6 +23,13 @@ data class ConfigUiState(
     val entry: PokemonEntry? = null,
     /** Every set that can render the selected Pokémon, animated ones first. */
     val availableSets: List<SpriteSet> = emptyList(),
+    /**
+     * The same sets, each with a URL that previews *this* Pokémon in it.
+     *
+     * The picker shows the art rather than describing it: "Platinum" and
+     * "HeartGold / SoulSilver" are indistinguishable as words and obvious as pictures.
+     */
+    val availableSetPreviews: List<SetPreview> = emptyList(),
     /** The set the widget is currently using, resolved from [config]. */
     val selectedSet: SpriteSet? = null,
     val allPokemon: List<PokemonEntry> = emptyList(),
@@ -121,10 +129,21 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
         val supported = set?.supports(config.back, config.shiny, config.female, config.style) == true
         val url = set?.let { source.spriteUrl(it, config.spriteKey) }
 
+        // Preview each set in the variant the user has chosen where it has one, and in
+        // plain front art where it does not — a set with no shiny sprite should still
+        // appear in the grid, showing what it *can* draw.
+        val previews = sets.map { candidate ->
+            val key = config.spriteKey.copy(setId = candidate.id)
+            val previewUrl = source.spriteUrl(candidate, key)
+                ?: source.spriteUrl(candidate, SpriteKey(candidate.id, config.pokemonId))
+            SetPreview(candidate, previewUrl)
+        }
+
         _state.update {
             it.copy(
                 entry = entry,
                 availableSets = sets,
+                availableSetPreviews = previews,
                 selectedSet = set,
                 previewUrl = url,
                 warning = when {

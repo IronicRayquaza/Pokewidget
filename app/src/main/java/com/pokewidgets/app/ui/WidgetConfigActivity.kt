@@ -6,9 +6,11 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +19,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pokewidgets.app.ui.screens.ConfigScreen
 import com.pokewidgets.app.ui.screens.PokemonPicker
+import com.pokewidgets.app.ui.screens.SpriteSetPickerScreen
+import com.pokewidgets.app.ui.theme.Paper
 import com.pokewidgets.app.ui.theme.PokeWidgetTheme
 
 /**
@@ -32,7 +36,13 @@ class WidgetConfigActivity : ComponentActivity() {
     private var widgetId = AppWidgetManager.INVALID_APPWIDGET_ID
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // The app is light on every screen, so the system bars are asked for dark icons
+        // once here rather than being left to follow the device theme and disappear into
+        // the cream stock on a phone set to dark mode.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
 
         widgetId = intent?.extras?.getInt(
@@ -50,7 +60,7 @@ class WidgetConfigActivity : ComponentActivity() {
 
         setContent {
             PokeWidgetTheme {
-                Surface {
+                Surface(color = Paper) {
                     ConfigFlow(widgetId) { finishWithResult() }
                 }
             }
@@ -70,27 +80,44 @@ class WidgetConfigActivity : ComponentActivity() {
 fun ConfigFlow(widgetId: Int, onDone: () -> Unit) {
     val viewModel: ConfigViewModel = viewModel()
     val state by viewModel.state.collectAsState()
-    var pickingPokemon by remember { mutableStateOf(false) }
+    var step by remember { mutableStateOf(ConfigStep.SETTINGS) }
 
-    androidx.compose.runtime.LaunchedEffect(widgetId) { viewModel.load(widgetId) }
+    LaunchedEffect(widgetId) { viewModel.load(widgetId) }
 
-    if (pickingPokemon) {
-        PokemonPicker(
+    when (step) {
+        ConfigStep.POKEMON -> PokemonPicker(
             all = state.allPokemon,
             selectedId = state.config.pokemonId,
             onSelect = {
                 viewModel.selectPokemon(it)
-                pickingPokemon = false
+                step = ConfigStep.SETTINGS
             },
-            onBack = { pickingPokemon = false },
+            onBack = { step = ConfigStep.SETTINGS },
         )
-    } else {
-        ConfigScreen(
+
+        ConfigStep.SPRITE_SET -> SpriteSetPickerScreen(
+            pokemonName = state.entry?.displayName ?: "this Pokémon",
+            sets = state.availableSetPreviews,
+            selectedSetId = state.config.setId,
+            onSelect = viewModel::selectSet,
+            onBack = { step = ConfigStep.SETTINGS },
+        )
+
+        ConfigStep.SETTINGS -> ConfigScreen(
             state = state,
-            onPickPokemon = { pickingPokemon = true },
-            onSelectSet = viewModel::selectSet,
+            onPickPokemon = { step = ConfigStep.POKEMON },
+            onPickSet = { step = ConfigStep.SPRITE_SET },
             onUpdate = viewModel::update,
             onSave = { viewModel.save(onDone) },
         )
     }
 }
+
+/**
+ * Where the configuration flow currently is.
+ *
+ * Both pickers are full pages rather than sheets or inline strips. Picking a Pokémon or
+ * a sprite set means comparing a lot of similar-looking things, and neither comparison
+ * fits in a row or survives a container that dismisses on a downward flick.
+ */
+private enum class ConfigStep { SETTINGS, POKEMON, SPRITE_SET }

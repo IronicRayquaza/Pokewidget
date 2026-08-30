@@ -31,6 +31,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 /**
  * Shrinks while held and springs back on release.
  *
+ * The scale is 0.96 and never lower. Below about 0.95 a press stops reading as a press
+ * and starts reading as the element recoiling from the finger.
+ *
  * The spring is deliberately bouncy: an over-damped return feels like the UI is
  * recovering from the touch, while a slight overshoot feels like the sprite is reacting
  * to it.
@@ -41,7 +44,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 @Composable
 fun Modifier.pressScale(
     interactionSource: MutableInteractionSource,
-    pressedScale: Float = 0.92f,
+    pressedScale: Float = 0.96f,
 ): Modifier {
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(

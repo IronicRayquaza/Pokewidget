@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.PokeWidget" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      The window behind Compose. Light regardless of the system setting, because the app
+      itself is: a dark window under a cream page shows as a dark flash on every cold
+      start and a dark band under the status bar until the first frame lands.
+    -->
+    <style name="Theme.PokeWidget" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/poke_paper</item>
+        <item name="android:colorBackground">@color/poke_paper</item>
+    </style>
 </resources>
