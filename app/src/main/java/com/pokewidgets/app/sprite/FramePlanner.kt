@@ -24,14 +24,33 @@ import kotlin.math.roundToInt
  */
 object FramePlanner {
 
-    /** Frame rates we're willing to drop to, in order of preference. */
-    val FPS_LADDER = intArrayOf(20, 15, 12, 10, 8, 6)
+    /**
+     * Frame rates we're willing to drop to, in order of preference.
+     *
+     * The bottom two rungs exist for Generation 5. Black/White's battle sprites are long
+     * idle loops — five to nine seconds, up to 160 frames — and at 8 fps a nine-second
+     * loop still needs 72 uniform steps, more than [MAX_FRAMES] allows. Without a rate
+     * below 6 there is nothing left to trade but sprite size.
+     */
+    val FPS_LADDER = intArrayOf(20, 15, 12, 10, 8, 6, 5, 4)
 
     /**
      * Below this we stop trading smoothness for size — an 8 fps idle loop still reads as
      * alive, a 6 fps one starts to strobe.
      */
     private const val COMFORTABLE_MIN_FPS = 8
+
+    /**
+     * The one rate below [COMFORTABLE_MIN_FPS] we will drop to in order to keep the sprite
+     * off 1:1.
+     *
+     * Rendering at 1:1 means a Black/White Charizard occupying 87 of a widget's 350
+     * pixels — a quarter of the width, adrift in the middle of it. That is a far more
+     * visible defect than 6 fps on an animation that is, in every one of these sets, a
+     * standing idle loop. Without this rung the planner would take the 1:1 deal, because
+     * the comfortable ladder is searched at every scale before any slower rate is.
+     */
+    private const val RESCUE_FPS = 6
 
     /**
      * Above this upscale, another doubling of bitmap size buys nothing a viewer can see:
@@ -125,8 +144,11 @@ object FramePlanner {
      *    12 fps and 8 fps is not.
      *  - Once it is down to a modest scale, defend the size and drop frame rate instead —
      *    a tiny sprite on a big widget reads as broken, a slightly choppy one does not.
-     *  - Only at 1:1 and 8 fps do we accept the strobier rates, and only after that do we
-     *    truncate the loop.
+     *  - Drawing at 1:1 is the last size to give up, not the first: it is worth one rung
+     *    of frame rate below the comfortable floor to avoid it. See [RESCUE_FPS].
+     *  - Only once nothing fits at any comfortable rate and any size do we accept the
+     *    strobier rates — and there size wins again, for the same reason.
+     *  - Only after all of that do we truncate the loop.
      */
     fun plan(request: Request): Plan {
         val src = request.source
@@ -147,15 +169,30 @@ object FramePlanner {
         for (scale in maxScale downTo min(GENEROUS_SCALE, maxScale)) {
             candidate(src, scale, startFps, request.budgetBytes)?.let { return it }
         }
-        // Pass 2: size now matters, so trade frame rate at each remaining scale.
-        for (scale in min(GENEROUS_SCALE, maxScale) downTo 1) {
+        // Pass 2: size now matters, so trade frame rate at each remaining scale — but not
+        // all the way down to 1:1 yet. See RESCUE_FPS.
+        for (scale in min(GENEROUS_SCALE, maxScale) downTo 2) {
             for (fps in comfortable) {
                 candidate(src, scale, fps, request.budgetBytes)?.let { return it }
             }
         }
-        // Pass 3: still over budget at 1:1 and 8 fps.
-        for (fps in FPS_LADDER.filter { it < COMFORTABLE_MIN_FPS }) {
+        // Pass 3: one rung below comfort, spent solely on keeping an upscale.
+        for (scale in min(GENEROUS_SCALE, maxScale) downTo 2) {
+            candidate(src, scale, RESCUE_FPS, request.budgetBytes)?.let { return it }
+        }
+        // Pass 4: 1:1, at the best rate it can hold.
+        for (fps in comfortable) {
             candidate(src, 1, fps, request.budgetBytes)?.let { return it }
+        }
+        // Pass 5: nothing fits at a comfortable rate, at any size. Smoothness is already
+        // conceded, so spend the strobier rates on size rather than dropping straight to
+        // 1:1 — which is what used to happen to every Black/White sprite with a loop
+        // longer than about seven seconds, leaving a 74px Zapdos marooned in the middle of
+        // a 350px widget with four fifths of its budget unspent.
+        for (scale in maxScale downTo 1) {
+            for (fps in FPS_LADDER.filter { it < COMFORTABLE_MIN_FPS }) {
+                candidate(src, scale, fps, request.budgetBytes)?.let { return it }
+            }
         }
         // A full loop of this sprite does not fit at all. Truncate it; the renderer
         // degrades to a still image at worst.

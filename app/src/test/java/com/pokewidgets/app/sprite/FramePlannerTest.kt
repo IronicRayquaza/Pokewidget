@@ -210,6 +210,73 @@ class FramePlannerTest {
         assertTrue(plan.distinctFrames.all { it in 0 until 20 })
     }
 
+    // ---- Generation 5, whose loops are longer than everything else -----------------
+
+    /**
+     * generation-v/black-white/animated/143.gif — a 74x75 canvas, 90 frames at 100 ms.
+     * Nine seconds of Zapdos, measured from the pinned sprite.
+     *
+     * Black/White is the only set whose loops run this long, and the length is what made
+     * it a problem: at every frame rate the planner considers comfortable, one loop needs
+     * more than MAX_FRAMES uniform steps, so none of them can be used at any scale at all.
+     */
+    private val zapdosBlackWhite = FramePlanner.Source(74, 75, List(90) { 100 })
+
+    @Test
+    fun `a nine-second Black-White loop is still drawn big enough to recognise`() {
+        val plan = FramePlanner.plan(
+            FramePlanner.Request(zapdosBlackWhite, 350, 350, budgetBytes = phone1080),
+        )
+
+        // The regression this guards: the last-resort pass used to hard-code scale 1, so
+        // a sprite that could not be planned at 8 fps fell all the way to 74x75 px in the
+        // middle of a 350 px widget — while spending under a fifth of the budget it had.
+        assertTrue(
+            "expected an upscale, got ${plan.scale}x using ${plan.estimatedBytes} of $phone1080",
+            plan.scale >= 2,
+        )
+        assertTrue(plan.estimatedBytes <= phone1080)
+        assertTrue(plan.stepCount in 1..FramePlanner.MAX_FRAMES)
+        assertTrue("should not have had to truncate the loop", !plan.truncated)
+    }
+
+    /**
+     * generation-v/black-white/animated/6.gif — an 87x89 canvas, 72 frames, 7.3 seconds.
+     *
+     * The awkward middle case. 8 fps is the slowest comfortable rate, and one loop at
+     * 8 fps is 58 uniform steps — just inside MAX_FRAMES, and affordable only at 1:1.
+     * The planner used to take that deal and draw Charizard 87 pixels tall on a 350 pixel
+     * widget, having spent a quarter of its budget.
+     */
+    private val charizardBlackWhite =
+        FramePlanner.Source(87, 89, List(72) { if (it == 0) 200 else 100 })
+
+    @Test
+    fun `1 to 1 is the last size given up, not the first`() {
+        val plan = FramePlanner.plan(
+            FramePlanner.Request(charizardBlackWhite, 350, 350, budgetBytes = phone1080),
+        )
+        assertTrue(
+            "expected an upscale, got ${plan.scale}x at ${plan.fps} fps using " +
+                "${plan.estimatedBytes} of $phone1080",
+            plan.scale >= 2,
+        )
+        assertTrue(plan.estimatedBytes <= phone1080)
+        assertTrue(plan.stepCount in 1..FramePlanner.MAX_FRAMES)
+    }
+
+    @Test
+    fun `dropping below the comfortable rate buys size, never the other way round`() {
+        val plan = FramePlanner.plan(
+            FramePlanner.Request(zapdosBlackWhite, 350, 350, budgetBytes = phone1080),
+        )
+        // Anything below 8 fps is only ever reached once nothing at or above it fits, so a
+        // plan that gave up frame rate must have spent the saving on scale.
+        if (plan.fps < 8) {
+            assertTrue("gave up frame rate for nothing", plan.scale > 1)
+        }
+    }
+
     // ---- Scale fitting -------------------------------------------------------------
 
     @Test

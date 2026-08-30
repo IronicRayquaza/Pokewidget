@@ -25,6 +25,8 @@ import com.pokewidgets.app.sprite.GifFrames
 import com.pokewidgets.app.sprite.IdleAnimator
 import com.pokewidgets.app.sprite.IdleFrame
 import com.pokewidgets.app.sprite.IdleStyle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /**
@@ -41,7 +43,19 @@ class WidgetRenderer(private val context: Context) {
     private val source = SpriteSource(context)
     private val configStore = WidgetConfigStore(context)
 
-    suspend fun render(widgetId: Int) {
+    /**
+     * Renders one widget. Safe to call from anywhere, including the main thread.
+     *
+     * The dispatcher is chosen here rather than left to the caller because the work is
+     * genuinely heavy and the callers do not look like they are asking for heavy work.
+     * A Black/White sprite is up to 160 GIF frames: decoding them, scanning every pixel of
+     * every frame for the opaque bounds and then hashing each one for the dedupe pass adds
+     * up to hundreds of milliseconds. The widget provider already ran this on
+     * [Dispatchers.Default], but `ConfigViewModel.save` calls it from `viewModelScope` —
+     * which is the main thread — so tapping "Add to home screen" froze the UI for as long
+     * as the chosen sprite was expensive.
+     */
+    suspend fun render(widgetId: Int) = withContext(Dispatchers.Default) {
         val manager = AppWidgetManager.getInstance(context)
         val config = resolveConfig(widgetId)
         val options = runCatching { manager.getAppWidgetOptions(widgetId) }.getOrNull()
