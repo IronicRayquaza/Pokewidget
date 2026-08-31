@@ -108,7 +108,7 @@ anchored at its feet, so it reads as weight rather than as the creature shrinkin
 
 Sprite art is immutable, so everything is cached forever: [`PokeAPI/sprites`][sprites] is
 pinned to one commit, and veekun's dump is a finished archive of shipped games.
-**31 sprite sets, 1,345 Pokémon and alternate forms.** Seven are genuinely animated:
+**32 sprite sets, 1,345 Pokémon and alternate forms.** Eight are genuinely animated:
 
 | Set | Hardware | Source | Coverage |
 |---|---|---|---|
@@ -119,6 +119,7 @@ pinned to one commit, and veekun's dump is a finished archive of shipped games.
 | **Platinum** | Nintendo DS | veekun | 493 — the two-frame in-game idle |
 | **HeartGold / SoulSilver** | Nintendo DS | veekun | 493 — the two-frame in-game idle |
 | **Crystal** | Game Boy Color | PokeAPI | 250 — the first animated sprites in the series |
+| **Box icons (Gen 5, animated)** | Nintendo DS | PokeAPI | 674 — the bobbing PC-box icons, as APNG |
 
 PokeAPI has no copy of the animation for Gen 3 and Gen 4, which is why a second provider
 exists. veekun hosts Emerald's real battle sequences as GIFs, and stores the second frame
@@ -151,19 +152,30 @@ that table is reported and skipped, so new sprite sets are a visible, deliberate
 
 ## Building
 
-Requires **JDK 17**. `gradle.properties` points `org.gradle.java.home` at a specific
-Temurin 17 install — change or delete that line on another machine.
+Requires **JDK 17** — not 18, which AGP 7.4.1 rejects. `gradle.properties` points
+`org.gradle.java.home` at a specific Temurin 17 install; change or delete that line on
+another machine.
 
 ```bash
 ./gradlew assembleDebug
-./gradlew testDebugUnitTest        # frame planner: budget, resampling, trade-offs
+./gradlew testDebugUnitTest        # planner, idle styles, sprite-set resolution
 ./gradlew connectedDebugAndroidTest # end-to-end, needs a device and a connection
 ```
 
-AGP 8.10.1 · Gradle 8.11.1 · Kotlin 2.1.0 · compileSdk 36 · minSdk 26.
+AGP 7.4.1 · Gradle 7.6.3 · Kotlin 2.1.0 · compileSdk 34 · minSdk 26.
 
-> Android Studio 2022.1 (Electric Eel) cannot open an AGP 8.x project. Build from the
-> command line, or update Studio.
+### Handing a build to a tester
+
+`assembleDebug` produces `app/build/outputs/apk/debug/app-debug.apk`, already signed with
+the debug key and installable as-is. It carries the `.debug` application id, so it sits
+alongside any other build of the app rather than replacing it.
+
+Release builds are **not** set up: there is no `signingConfigs` block, so `assembleRelease`
+emits an unsigned APK that will not install. `isMinifyEnabled` is on but has never been
+exercised, and the riskiest part is silent rather than loud — `WidgetConfigStore` persists
+enum *names*, and reads them back through a `runCatching { … } ?: fallback`, so an R8 rename
+would not crash, it would quietly reset every widget to its defaults. Shake that out before
+shipping a minified build.
 
 ### Testing
 

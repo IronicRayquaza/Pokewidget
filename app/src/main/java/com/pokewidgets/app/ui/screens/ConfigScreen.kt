@@ -42,6 +42,9 @@ import com.pokewidgets.app.data.Fill
 import com.pokewidgets.app.data.Smoothness
 import com.pokewidgets.app.data.TapAction
 import com.pokewidgets.app.data.WidgetConfig
+import com.pokewidgets.app.catalog.FormRules
+import com.pokewidgets.app.catalog.SpriteSet
+import com.pokewidgets.app.sprite.IdleAnimator
 import com.pokewidgets.app.sprite.IdleStyle
 import com.pokewidgets.app.ui.ConfigUiState
 import com.pokewidgets.app.ui.components.Caption
@@ -102,6 +105,7 @@ fun ConfigScreen(
             }
 
             VariantSection(state, onUpdate)
+            LiveFormSection(state, onUpdate)
             AppearanceSection(state, onUpdate)
             AnimationSection(state, onUpdate)
             InteractionSection(state, onUpdate)
@@ -264,13 +268,61 @@ private fun SetRow(state: ConfigUiState, onPick: () -> Unit) {
     }
 }
 
+/**
+ * Games whose battle sprites really do animate in the cartridge, but whose animation nobody
+ * has ever published. veekun dumped Emerald and only Emerald, so these two are the app's
+ * genuine gaps — everything else either has its animation shipped as a separate set, or has
+ * no animation to find.
+ */
+private val ANIMATED_IN_ROM_ONLY = setOf(
+    "versions_generation_iii_ruby_sapphire",
+    "versions_generation_iii_firered_leafgreen",
+)
+
+/**
+ * Why this set doesn't move on its own.
+ *
+ * There is no single true answer, which is the point: this text used to claim that every
+ * still set's "real in-game animation only exists inside the ROM", which is false for Red and
+ * Blue — those games never animated anything — and false again for Scarlet and Violet, which
+ * animate a 3D model and have no 2D animation in the ROM either.
+ */
+private fun stillSetExplanation(set: SpriteSet?, available: List<SpriteSet>): String {
+    if (set == null) return "This set ships as still images, so PokéWidget adds the movement."
+
+    // Several games are in the app twice — a still dump and an animated one. Saying so is
+    // more useful than any explanation, because the real thing is one tap away.
+    val animatedSibling = available.firstOrNull { it.animated && it.game == set.game && it.id != set.id }
+    return when {
+        animatedSibling != null ->
+            "${set.game}'s real animation is in the “${animatedSibling.label}” set — " +
+                "pick that one for the genuine article."
+
+        IdleAnimator.isRendered(set.id) ->
+            "${set.game} animates a 3D model rather than a sprite, so there is no 2D " +
+                "animation to fetch — PokéWidget adds the movement instead."
+
+        set.id in ANIMATED_IN_ROM_ONLY ->
+            "${set.game} does animate its sprites, but that animation only exists inside " +
+                "the cartridge — nobody has published a dump of it, so PokéWidget generates " +
+                "the movement instead."
+
+        else ->
+            "${set.game} never animated its sprites — this is exactly what the game drew, " +
+                "and the movement is PokéWidget's."
+    }
+}
+
 @Composable
 private fun VariantSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit) {
     val set = state.availableSets.firstOrNull { it.id == state.config.setId } ?: return
     val c = state.config
-    val canShiny = set.supports(c.back, true, c.female, c.style)
-    val canBack = set.supports(true, c.shiny, c.female, c.style)
-    val canFemale = set.supports(c.back, c.shiny, true, c.style)
+    // Per *this* Pokémon, not per set. Upstream's `female/` directories hold about forty
+    // sprites while the set advertises the directory for all 1345, so asking the set-level
+    // question here is what used to offer a Female chip that produced a permanent 404.
+    val canShiny = set.covers(c.pokemonId, c.back, true, c.female, c.style)
+    val canBack = set.covers(c.pokemonId, true, c.shiny, c.female, c.style)
+    val canFemale = set.covers(c.pokemonId, c.back, c.shiny, true, c.style)
     if (!canShiny && !canBack && !canFemale) return
 
     Panel {
@@ -297,6 +349,41 @@ private val BACKGROUND_SWATCHES = listOf(
     0xCC5B2333.toInt(),
     0x66000000,
 )
+
+/**
+ * Offered only for the handful of Pokémon that have a real-world trigger, because for
+ * everyone else it is a switch that does nothing. See `FormRules`.
+ */
+@Composable
+private fun LiveFormSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit) {
+    val c = state.config
+    val trigger = FormRules.describe(c.pokemonId) ?: return
+    val name = state.entry?.name ?: "This Pokémon"
+
+    Panel {
+        SectionHeader("Live form")
+        SettingRow(
+            title = "Follow the real world",
+            subtitle = "$name $trigger",
+        ) {
+            PokeSwitch(c.liveForm) { on -> onUpdate { it.copy(liveForm = on) } }
+        }
+        AnimatedVisibility(visible = c.liveForm) {
+            Column {
+                Spacer(Modifier.height(10.dp))
+                Caption(
+                    if (state.weatherPlace == null) {
+                        "Set a city in Settings and the widget will follow its weather. " +
+                            "Until then it follows the clock only."
+                    } else {
+                        "Following the weather in ${state.weatherPlace}. The widget keeps " +
+                            "the Pokémon you chose — only its form changes."
+                    },
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun AppearanceSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit) {
@@ -390,9 +477,8 @@ private fun AnimationSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> 
                 )
                 Spacer(Modifier.height(10.dp))
                 Caption(
-                    c.idleStyle.description + ". " + (state.selectedSet?.label ?: "This set") +
-                        " ships as still images — its real in-game animation only exists " +
-                        "inside the ROM, so PokéWidget generates the movement instead.",
+                    c.idleStyle.description + ". " +
+                        stillSetExplanation(state.selectedSet, state.availableSets),
                 )
             }
         }

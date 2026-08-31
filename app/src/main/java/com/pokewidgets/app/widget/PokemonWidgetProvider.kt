@@ -7,7 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import com.pokewidgets.app.data.SpriteSource
 import com.pokewidgets.app.data.TapAction
+import com.pokewidgets.app.data.WeatherSource
 import com.pokewidgets.app.data.WidgetConfigStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +31,14 @@ sealed class PokemonWidgetProvider : AppWidgetProvider() {
         // goAsync() is safe here: AppWidgetProvider dispatches onUpdate synchronously
         // from onReceive, so we are still inside the receiver's window.
         WidgetUpdater.request(context, widgetIds, goAsync())
+        // onUpdate fires on boot, which is the one moment an AlarmManager schedule is
+        // guaranteed to have been lost. Re-arming here is why this feature needs no
+        // RECEIVE_BOOT_COMPLETED permission.
+        val appContext = context.applicationContext
+        scope.launch {
+            runCatching { WeatherRefreshScheduler.sync(appContext) }
+                .onFailure { Log.w(TAG, "could not sync the weather alarm", it) }
+        }
     }
 
     /** Fired when the user resizes the widget — the sprite is re-planned for the new box. */
@@ -64,11 +74,51 @@ sealed class PokemonWidgetProvider : AppWidgetProvider() {
             adoptPinned(context, goAsync())
             return
         }
+        if (intent.action == WeatherRefreshScheduler.ACTION_WEATHER) {
+            refreshLiveForms(context, goAsync())
+            return
+        }
         // Everything else goes through onUpdate, which renders via WidgetRenderer. Note
         // that a *newly placed* widget is not among them: a provider declaring an
         // android:configure activity is deliberately sent no APPWIDGET_UPDATE on
         // placement, which is what ACTION_PINNED above exists to cover.
         super.onReceive(context, intent)
+    }
+
+    /**
+     * The hourly weather tick: fetch once, then redraw only the widgets that care.
+     *
+     * The fetch is done here rather than left to each render so that one alarm costs one
+     * network round trip however many Castforms are on the home screen, and so that a widget
+     * whose form has not actually changed is not re-rendered at all — a redraw is the
+     * expensive part, not the request.
+     */
+    private fun refreshLiveForms(context: Context, pending: BroadcastReceiver.PendingResult) {
+        val appContext = context.applicationContext
+        scope.launch {
+            try {
+                val store = WidgetConfigStore(appContext)
+                val live = store.knownWidgetIds().filter {
+                    runCatching { store.get(it).liveForm }.getOrDefault(false)
+                }
+                if (live.isEmpty()) {
+                    // Nothing wants this any more — the last live-form widget was deleted,
+                    // and onDeleted has no way to know that was the last one.
+                    WeatherRefreshScheduler.sync(appContext)
+                    return@launch
+                }
+                WeatherSource(appContext).refresh()
+                val renderer = WidgetRenderer(appContext)
+                for (id in live) {
+                    runCatching { renderer.render(id) }
+                        .onFailure { Log.e(TAG, "weather re-render failed for $id", it) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "weather refresh failed", e)
+            } finally {
+                pending.finish()
+            }
+        }
     }
 
     /**
@@ -122,6 +172,17 @@ sealed class PokemonWidgetProvider : AppWidgetProvider() {
             try {
                 val store = WidgetConfigStore(appContext)
                 val config = store.get(widgetId)
+
+                // A widget with no cached art is not showing a Pokémon — it is showing an
+                // error, and the only thing its owner can mean by tapping it is "try again".
+                // Honour that before the configured action, whatever that action is: the
+                // default is CRY, which never re-renders, so without this a widget that
+                // failed once stayed broken until a reboot. SpriteSource remembers confirmed
+                // 404s, so a sprite that genuinely does not exist costs no round trip here.
+                if (!SpriteSource(appContext).isSpriteCached(config.spriteKey)) {
+                    WidgetRenderer(appContext).render(widgetId)
+                }
+
                 when (config.tapAction) {
                     TapAction.CRY -> {
                         if (config.cryEnabled) CryPlayer.play(appContext, config.pokemonId, config.legacyCry)

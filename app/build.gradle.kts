@@ -13,8 +13,8 @@ android {
         applicationId = "com.pokewidgets.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -38,6 +38,9 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
+            // Testers report against a build, not a commit. Showing the suffix in Settings →
+            // Apps is the cheapest way to know which one they are actually running.
+            versionNameSuffix = "-debug"
         }
     }
 
@@ -101,6 +104,8 @@ android {
             force("androidx.appcompat:appcompat-resources:1.6.1")
             force("androidx.activity:activity:1.8.2")
             force("androidx.activity:activity-compose:1.8.2")
+            force("androidx.core:core-ktx:1.12.0")
+            force("androidx.core:core:1.12.0")
             force("androidx.profileinstaller:profileinstaller:1.3.1")
             force("androidx.vectordrawable:vectordrawable:1.1.0")
             force("androidx.vectordrawable:vectordrawable-animated:1.1.0")

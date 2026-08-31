@@ -60,6 +60,17 @@ data class WidgetConfig(
      */
     val idleStyle: IdleStyle = IdleAnimator.DEFAULT,
 
+    /**
+     * Let the real world choose the form, for the handful of Pokémon that have one to
+     * choose — Castform takes the weather's shape, Lycanroc the time of day. Off by
+     * default, and only offered when the chosen Pokémon has a rule; see
+     * [com.pokewidgets.app.catalog.FormRules].
+     *
+     * Stored per widget rather than globally so two Castforms can disagree, which is exactly
+     * the sort of thing someone puts two Castforms on a home screen to do.
+     */
+    val liveForm: Boolean = false,
+
     /** Set while an "excited" tap burst is running, so the renderer speeds the flip up. */
     val excitedUntilMs: Long = 0L,
 ) {

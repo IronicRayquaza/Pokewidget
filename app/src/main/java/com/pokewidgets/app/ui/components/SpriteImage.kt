@@ -40,6 +40,14 @@ fun SpriteImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
 ) {
+    // A null url means "not resolved yet" — the config screen composes before its ViewModel
+    // has loaded. Handing that to Coil is treated as a *failed request*: it throws
+    // NullRequestDataException and logs a full stack trace, twice, every time the screen
+    // opens. Nothing to draw is not an error, so draw nothing.
+    if (url == null) {
+        Box(modifier)
+        return
+    }
     AsyncImage(
         model = url,
         contentDescription = contentDescription,

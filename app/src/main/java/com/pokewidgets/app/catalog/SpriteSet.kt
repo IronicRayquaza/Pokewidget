@@ -2,6 +2,7 @@ package com.pokewidgets.app.catalog
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /** Where a set's files are served from. Decides how [SpriteSet.path] becomes a URL. */
 object SpriteProvider {
@@ -70,6 +71,57 @@ data class SpriteSet(
         variantPath(back, shiny, female, style) != null
 
     /**
+     * Whether this set actually holds [pokemonId] in the given variant.
+     *
+     * [variantPath] only answers "does this set have a `female/` directory at all", which is
+     * a different question: upstream's `female/` directories hold about forty Pokémon, and
+     * Black/White's `back/` stops at 905 while its front reaches 1025. Asking the directory
+     * question and acting on the answer is what puts a permanent 404 on the home screen.
+     */
+    fun covers(pokemonId: Int, back: Boolean, shiny: Boolean, female: Boolean, style: String?): Boolean {
+        val path = variantPath(back, shiny, female, style) ?: return false
+        return pokemonId in idsFor(path)
+    }
+
+    /**
+     * The variant to actually fetch for [pokemonId], giving up flags one at a time until
+     * something exists. Null means this set never drew this Pokémon at all, in any variant.
+     *
+     * Flags are surrendered least-deliberate first — a female sprite is a detail most people
+     * would not notice missing, a shiny is the whole reason they chose it — so the result is
+     * the closest thing to what was asked for rather than a blunt fall back to plain front.
+     * [ResolvedVariant.exact] is false whenever anything was given up, which is what lets the
+     * UI say so instead of silently showing something else.
+     */
+    fun resolveVariant(
+        pokemonId: Int,
+        back: Boolean,
+        shiny: Boolean,
+        female: Boolean,
+        style: String?,
+    ): ResolvedVariant? {
+        var b = back
+        var s = shiny
+        var f = female
+        var st = style
+        var exact = true
+        // Order matters: each step drops the least deliberate remaining choice.
+        while (true) {
+            variantPath(b, s, f, st)
+                ?.takeIf { pokemonId in idsFor(it) }
+                ?.let { return ResolvedVariant(it, exact) }
+            when {
+                f -> f = false
+                st != null -> st = null
+                b -> b = false
+                s -> s = false
+                else -> return null
+            }
+            exact = false
+        }
+    }
+
+    /**
      * Finds the real directory path for a variant combination, or null if this set
      * has no such variant. Tries every plausible segment order because upstream's
      * ordering differs between generations.
@@ -89,7 +141,15 @@ data class SpriteSet(
         return null
     }
 
-    fun idsFor(variant: String): IdRanges = IdRanges.parse(variants[variant].orEmpty())
+    /**
+     * Ids covered by one variant directory. Memoised: [resolveVariant] can ask several
+     * times for one sprite, and sets outlive every widget render.
+     */
+    fun idsFor(variant: String): IdRanges =
+        variantIds.getOrPut(variant) { IdRanges.parse(variants[variant].orEmpty()) }
+
+    @Transient
+    private val variantIds = java.util.concurrent.ConcurrentHashMap<String, IdRanges>()
 
     private fun <T> permutations(items: List<T>): List<List<T>> {
         if (items.size <= 1) return listOf(items)
@@ -101,6 +161,12 @@ data class SpriteSet(
         return out
     }
 }
+
+/**
+ * The outcome of [SpriteSet.resolveVariant]: which directory to fetch from, and whether it
+ * is the variant that was asked for or the nearest one this set actually has.
+ */
+data class ResolvedVariant(val path: String, val exact: Boolean)
 
 @Serializable
 data class SpriteSetIndex(

@@ -220,6 +220,22 @@ export const SET_META = {
   },
 
   // ---- Box / menu icons --------------------------------------------------------
+  //
+  // Generation 5's are the only animated ones: Black and White's PC boxes bob their icons,
+  // and the dump preserves that as two-frame APNG. Sun/Moon and Sword/Shield icons are
+  // genuinely still.
+  'versions/generation-v/icons/animated': {
+    label: 'Box icons (Gen 5, animated)',
+    game: 'Pokémon Black & White',
+    hardware: 'Nintendo DS',
+    gen: 5,
+    animated: true,
+    // APNG, so the file extension really is png. The decoder sniffs the acTL chunk rather
+    // than trusting this — see ApngFrames.isApng.
+    ext: 'png',
+    order: 7,
+    note: 'The animated PC-box icons, exactly as Black and White drew them.',
+  },
   'versions/generation-v/icons': {
     label: 'Box icons (Gen 5)',
     game: 'Pokémon Black & White',
@@ -366,6 +382,5 @@ export const VEEKUN_SETS = {
 
 /** Sets we deliberately skip, with the reason, so the generator's report stays clean. */
 export const SKIPPED_SETS = {
-  'versions/generation-v/icons/animated': 'APNG, not GIF — the widget frame pipeline only decodes GIF.',
   'other/dream-world': 'SVG only; no raster pipeline in the app.',
 };

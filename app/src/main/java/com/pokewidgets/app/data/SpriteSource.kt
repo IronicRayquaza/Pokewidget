@@ -15,6 +15,23 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
+ * What [SpriteSource.spriteParts] found.
+ *
+ * [Missing] and [Offline] are deliberately different: one is a fact about upstream that will
+ * never change, the other is a fact about right now. The widget shows a different message for
+ * each, and only [Offline] invites a retry.
+ */
+sealed interface SpriteFetch {
+    /**
+     * @param exact false when the requested variant did not exist for this Pokémon and a
+     *   nearer one was used instead — see [com.pokewidgets.app.catalog.SpriteSet.resolveVariant].
+     */
+    class Ok(val parts: List<ByteArray>, val exact: Boolean) : SpriteFetch
+    object Missing : SpriteFetch
+    object Offline : SpriteFetch
+}
+
+/**
  * Fetches sprite and cry bytes, and keeps them on disk forever.
  *
  * "Forever" is safe because sprite art is immutable: PokeAPI URLs are pinned to one
@@ -29,8 +46,14 @@ class SpriteSource(context: Context) {
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            // Renders triggered by a tap or an update run inside a broadcast receiver's
+            // goAsync() window, which Android grants roughly ten seconds. An unbounded call
+            // outlives it and finishes in a process the system is free to kill, so the work
+            // is lost with no error to show. Bounding the whole call means a bad network
+            // fails fast enough to report "no connection" — which the tap can now retry.
+            .callTimeout(25, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
     }
@@ -51,48 +74,77 @@ class SpriteSource(context: Context) {
         cachedSpriteFile(key, ext).let { it.isFile && it.length() > 0 }
 
     /**
+     * Whether *any* art is on disk for this key, without needing the set to learn its
+     * extension. Used by the tap handler to tell "the widget is showing a sprite" from
+     * "the widget is showing an error", which is the difference between a tap meaning
+     * "play the cry" and a tap meaning "please try that again".
+     */
+    fun isSpriteCached(key: SpriteKey): Boolean =
+        SPRITE_EXTS.any { isSpriteCached(key, it) }
+
+    /**
      * Every file this sprite is made of, downloading any that are not cached yet.
      *
      * Usually one element. Sets that store their animation as separate stills — see
-     * [SpriteSet.frameDirs] — return one element per frame, in playback order. Null means
-     * the sprite genuinely isn't available: a variant this set doesn't have, or offline
-     * with nothing cached.
+     * [SpriteSet.frameDirs] — return one element per frame, in playback order.
+     *
+     * The two failure modes are kept apart on purpose. [SpriteFetch.Missing] means upstream
+     * does not have this sprite and never will, so retrying is pointless; [SpriteFetch.Offline]
+     * means the network failed and retrying is exactly the right thing. Collapsing them into
+     * one null is what used to put "Tap to retry — no connection" under a sprite that no
+     * amount of connection could produce.
      */
-    suspend fun spriteParts(set: SpriteSet, key: SpriteKey): List<ByteArray>? {
-        val variant = set.variantPath(key.back, key.shiny, key.female, key.style) ?: return null
+    suspend fun spriteParts(set: SpriteSet, key: SpriteKey): SpriteFetch {
+        val resolved = set.resolveVariant(key.pokemonId, key.back, key.shiny, key.female, key.style)
+            ?: return SpriteFetch.Missing
         val parts = ArrayList<ByteArray>(set.partCount)
+        var offline = false
         for (part in 0 until set.partCount) {
             // A composite set is only as animated as its rarest frame. If a later frame is
             // missing, fall back to what we have rather than failing the whole sprite —
             // one frame still renders, and the procedural idle takes over from there.
-            val bytes = spritePart(set, key, variant, part) ?: break
-            parts.add(bytes)
+            when (val fetched = spritePart(set, key, resolved.path, part)) {
+                is PartFetch.Ok -> parts.add(fetched.bytes)
+                PartFetch.Missing -> break
+                PartFetch.Offline -> { offline = true; break }
+            }
         }
-        return parts.ifEmpty { null }
+        if (parts.isNotEmpty()) return SpriteFetch.Ok(parts, resolved.exact)
+        return if (offline) SpriteFetch.Offline else SpriteFetch.Missing
     }
 
     /** Convenience for the single-file case. */
     suspend fun spriteBytes(set: SpriteSet, key: SpriteKey): ByteArray? =
-        spriteParts(set, key)?.firstOrNull()
+        (spriteParts(set, key) as? SpriteFetch.Ok)?.parts?.firstOrNull()
 
     private suspend fun spritePart(
         set: SpriteSet,
         key: SpriteKey,
         variant: String,
         part: Int,
-    ): ByteArray? {
+    ): PartFetch {
         val file = cachedSpriteFile(key, set.ext, part)
-        if (file.isFile && file.length() > 0) return file.readBytes()
+        if (file.isFile && file.length() > 0) return PartFetch.Ok(file.readBytes())
 
-        val bytes = download(spriteUrls(set, spritePath(set, key, variant, part))) ?: return null
-        runCatching { file.writeBytes(bytes) }
-            .onFailure { Log.w(TAG, "could not cache ${file.name}", it) }
-        return bytes
+        // The resolved variant is cached under the *requested* key. Sprites are immutable and
+        // the tree is SHA-pinned, so recording "this is what that request resolves to" can
+        // never go stale.
+        val urls = spriteUrls(set, spritePath(set, key, variant, part))
+        return when (val fetched = download(urls)) {
+            is Fetched.Ok -> {
+                runCatching { file.writeBytes(fetched.bytes) }
+                    .onFailure { Log.w(TAG, "could not cache ${file.name}", it) }
+                PartFetch.Ok(fetched.bytes)
+            }
+            Fetched.Missing -> PartFetch.Missing
+            Fetched.Offline -> PartFetch.Offline
+        }
     }
 
     fun spriteUrl(set: SpriteSet, key: SpriteKey): String? {
-        val variant = set.variantPath(key.back, key.shiny, key.female, key.style) ?: return null
-        return spriteUrls(set, spritePath(set, key, variant, part = 0)).first()
+        val resolved = set.resolveVariant(key.pokemonId, key.back, key.shiny, key.female, key.style)
+            ?: return null
+        return spriteUrls(set, spritePath(set, key, resolved.path, part = 0)).first()
     }
 
     /**
@@ -163,11 +215,13 @@ class SpriteSource(context: Context) {
                 "https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/$flavour/$pokemonId.ogg",
             ),
         )
-        if (bytes == null) {
-            missingCries.add(id)
+        if (bytes !is Fetched.Ok) {
+            // Only a confirmed absence is remembered; being offline is not evidence that
+            // upstream lacks the cry.
+            if (bytes is Fetched.Missing) missingCries.add(id)
             return null
         }
-        return runCatching { file.also { it.writeBytes(bytes) } }.getOrNull()
+        return runCatching { file.also { it.writeBytes(bytes.bytes) } }.getOrNull()
     }
 
     // ---- Cache management ------------------------------------------------------
@@ -181,31 +235,63 @@ class SpriteSource(context: Context) {
     fun clearCache() {
         spriteDir.listFiles()?.forEach { it.delete() }
         cryDir.listFiles()?.forEach { it.delete() }
+        // Clearing the cache should mean *everything*, including what we learned upstream
+        // does not have — otherwise a re-pinned SHA could never be re-probed.
+        missingSprites.clear()
+        missingCries.clear()
     }
 
     // ---- Transport -------------------------------------------------------------
 
-    private suspend fun download(urls: List<String>): ByteArray? = withContext(Dispatchers.IO) {
+    private suspend fun download(urls: List<String>): Fetched = withContext(Dispatchers.IO) {
+        // A confirmed miss is permanent for this install, so a widget whose tap now retries
+        // does not re-request a known 404 every time it is touched. Only a *definite* 404
+        // is recorded — never an IOException, which would poison the cache the first time
+        // the device happened to be offline.
+        if (urls.any { it in missingSprites }) return@withContext Fetched.Missing
+
+        var sawNetworkFailure = false
         for (url in urls) {
             try {
                 client.newCall(Request.Builder().url(url).build()).execute().use { response ->
                     if (response.isSuccessful) {
                         val body = response.body?.bytes()
-                        if (body != null && body.isNotEmpty()) return@withContext body
+                        if (body != null && body.isNotEmpty()) return@withContext Fetched.Ok(body)
                     }
                     // A 404 means this variant doesn't exist upstream; the mirror won't
                     // have it either, so don't waste a second round trip.
-                    if (response.code == 404) return@withContext null
+                    if (response.code == 404) {
+                        missingSprites.add(url)
+                        return@withContext Fetched.Missing
+                    }
                 }
             } catch (e: IOException) {
+                sawNetworkFailure = true
                 Log.d(TAG, "fetch failed for $url: ${e.message}")
             }
         }
-        null
+        if (sawNetworkFailure) Fetched.Offline else Fetched.Missing
+    }
+
+    /** What a single HTTP attempt came back with. */
+    private sealed interface Fetched {
+        class Ok(val bytes: ByteArray) : Fetched
+        object Missing : Fetched
+        object Offline : Fetched
+    }
+
+    /** Same three outcomes, for one file of a possibly-composite sprite. */
+    private sealed interface PartFetch {
+        class Ok(val bytes: ByteArray) : PartFetch
+        object Missing : PartFetch
+        object Offline : PartFetch
     }
 
     private companion object {
         const val TAG = "SpriteSource"
+
+        /** Every extension any set uses; see `SpriteSet.ext`. */
+        val SPRITE_EXTS = listOf("gif", "png")
 
         /**
          * `"<flavour>/<id>"` pairs upstream has confirmed it does not have.
@@ -215,5 +301,8 @@ class SpriteSource(context: Context) {
          * and re-request it each time.
          */
         val missingCries: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+        /** Sprite URLs upstream has answered 404 for. Same reasoning as [missingCries]. */
+        val missingSprites: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
     }
 }

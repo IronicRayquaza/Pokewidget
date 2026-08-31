@@ -53,6 +53,7 @@ class WidgetConfigStore(context: Context) {
             prefs[Keys.fill(widgetId)] = config.fill.name
             prefs[Keys.tap(widgetId)] = config.tapAction.name
             prefs[Keys.idleStyle(widgetId)] = config.idleStyle.name
+            prefs[Keys.liveForm(widgetId)] = config.liveForm
             prefs[Keys.excited(widgetId)] = config.excitedUntilMs
         }
     }
@@ -136,6 +137,7 @@ class WidgetConfigStore(context: Context) {
             fill = prefs[Keys.fill(id)].toEnum(d.fill),
             tapAction = prefs[Keys.tap(id)].toEnum(d.tapAction),
             idleStyle = prefs[Keys.idleStyle(id)].toEnum(d.idleStyle),
+            liveForm = prefs[Keys.liveForm(id)] ?: d.liveForm,
             excitedUntilMs = prefs[Keys.excited(id)] ?: 0L,
         )
     }
@@ -169,6 +171,7 @@ class WidgetConfigStore(context: Context) {
         fun fill(id: Int) = stringPreferencesKey("$id.fill")
         fun tap(id: Int) = stringPreferencesKey("$id.tap")
         fun idleStyle(id: Int) = stringPreferencesKey("$id.idleStyle")
+        fun liveForm(id: Int) = booleanPreferencesKey("$id.liveForm")
         fun excited(id: Int) = longPreferencesKey("$id.excited")
     }
 }

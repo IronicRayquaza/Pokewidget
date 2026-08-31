@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pokewidgets.app.catalog.PokemonEntry
+import com.pokewidgets.app.data.Place
 import com.pokewidgets.app.ui.MainUiState
 import com.pokewidgets.app.ui.PlacedWidget
 import com.pokewidgets.app.ui.components.Caption
@@ -76,6 +77,8 @@ fun MainScreen(
     onPin: (Int, String) -> Unit,
     onEditWidget: (Int) -> Unit,
     onClearCache: () -> Unit,
+    onPlaceQuery: (String) -> Unit,
+    onChoosePlace: (Place?) -> Unit,
     onPlayCry: (Int) -> Unit,
 ) {
     var showSettings by remember { mutableStateOf(false) }
@@ -95,6 +98,12 @@ fun MainScreen(
             cacheBytes = state.cacheBytes,
             onClearCache = onClearCache,
             onBack = { showSettings = false },
+            weatherPlace = state.weatherPlace,
+            placeQuery = state.placeQuery,
+            placeResults = state.placeResults,
+            searchingPlaces = state.searchingPlaces,
+            onPlaceQuery = onPlaceQuery,
+            onChoosePlace = onChoosePlace,
         )
 
         else -> BrowseScreen(

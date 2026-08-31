@@ -91,9 +91,12 @@ Status snapshot for PokéWidget. See `README.md` for architecture and how-it-wor
 - **veekun has no CDN.** Its sets come from one origin with no mirror
   (`veekun/pokedex-media` holds only a README). Acceptable because each sprite is fetched
   once and cached forever, and a failed fetch degrades to the generated idle.
-- **Gen 5 animated icon set (APNG) skipped.** `versions/generation-v/icons/animated` is
-  APNG, not GIF, and the decode pipeline is GIF-only. Listed in `SKIPPED_SETS` in
-  `tools/sets.config.mjs` rather than silently dropped.
+- ~~**Gen 5 animated icon set (APNG) skipped.**~~ Fixed. `ApngFrames` rebuilds each frame
+  from the `fcTL`/`fdAT` chunks as a standalone PNG, so the set ships as
+  "Box icons (Gen 5, animated)". `ImageDecoder` was not an option: API 28+ against a
+  minSdk of 26, and it exposes no per-frame access for a `ViewFlipper`. The format is
+  detected by sniffing `acTL`, not by extension — an APNG's extension is `.png`, and a
+  missed detection is silent, because `BitmapFactory` reads the first frame quite happily.
 - **No automated instrumented-test run in CI** — `connectedDebugAndroidTest` was run
   manually against a local emulator during development; there's no CI workflow wired up
   in this repo yet.

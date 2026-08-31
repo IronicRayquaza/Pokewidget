@@ -64,6 +64,8 @@ class MainActivity : ComponentActivity() {
                             )
                         },
                         onClearCache = viewModel::clearCache,
+                        onPlaceQuery = viewModel::searchPlaces,
+                        onChoosePlace = viewModel::choosePlace,
                         onPlayCry = viewModel::playCry,
                     )
                 }

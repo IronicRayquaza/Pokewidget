@@ -80,6 +80,23 @@ enum class IdleStyle(
 
     /** A taller, slower float with a little horizontal drift. One bitmap. */
     HOVER("Hover", "Floats, for Pokémon that never touch the ground", 130),
+
+    /**
+     * A uniform swell with a slight rise — the sprite gets bigger, never a different shape.
+     *
+     * [BREATHE] deliberately distorts, and on a 40x40 pixel sprite that reads as a creature
+     * drawing breath. On a Scarlet/Violet or HOME render four hundred pixels wide it reads
+     * as the *photograph* being stretched, because a rendered model has no reason to change
+     * proportion. Same idea, no shape change. Three bitmaps, six steps.
+     */
+    SETTLE("Swell", "Grows and sinks without changing shape — best for 3D renders", 170),
+
+    /**
+     * Picks between [BREATHE] and [SETTLE] based on how the set was drawn. The default,
+     * because the right answer differs across the catalogue and nobody should have to know
+     * that Generation 6 stopped drawing sprites.
+     */
+    AUTO("Auto", "Matches the artwork — a breath for pixel art, a swell for 3D renders", 150),
     ;
 
     val frames: List<IdleFrame> get() = IdleAnimator.frames(this)
@@ -88,7 +105,7 @@ enum class IdleStyle(
 object IdleAnimator {
 
     /** The style used for a still sprite when the user has not chosen one. */
-    val DEFAULT = IdleStyle.BREATHE
+    val DEFAULT = IdleStyle.AUTO
 
     fun frames(style: IdleStyle): List<IdleFrame> = when (style) {
         IdleStyle.NONE -> STILL
@@ -96,6 +113,38 @@ object IdleAnimator {
         IdleStyle.BREATHE -> BREATHE
         IdleStyle.SWAY -> SWAY
         IdleStyle.HOVER -> HOVER
+        IdleStyle.SETTLE -> SETTLE
+        // Only reached if AUTO is asked for its frames without a set to resolve against.
+        // Pixel art is the larger half of the catalogue, so it is the safer guess.
+        IdleStyle.AUTO -> BREATHE
+    }
+
+    /**
+     * Sets whose art is a rendered 3D model rather than a drawn sprite.
+     *
+     * Listed rather than derived from `gen`, because generation is the wrong axis: the
+     * Generation 7 and 8 *icon* sets are pixel art despite their generation, and would look
+     * wrong with a render's idle.
+     */
+    private val RENDER_SETS = setOf(
+        "versions_generation_vi_x_y",
+        "versions_generation_vi_omegaruby_alphasapphire",
+        "versions_generation_vii_ultra_sun_ultra_moon",
+        "versions_generation_viii_brilliant_diamond_shining_pearl",
+        "versions_generation_ix_scarlet_violet",
+        "versions_generation_ix_champions",
+        "other_home",
+        "other_official_artwork",
+    )
+
+    /** Whether this set's art is a rendered 3D model rather than a drawn sprite. */
+    fun isRendered(setId: String): Boolean = setId in RENDER_SETS
+
+    /** Turns [IdleStyle.AUTO] into a concrete style for this set; every other style is itself. */
+    fun resolve(style: IdleStyle, setId: String): IdleStyle = when {
+        style != IdleStyle.AUTO -> style
+        setId in RENDER_SETS -> IdleStyle.SETTLE
+        else -> IdleStyle.BREATHE
     }
 
     private val STILL = listOf(IdleFrame())
@@ -159,6 +208,21 @@ object IdleAnimator {
         IdleFrame(dxSource = -1, dySource = -3),
         IdleFrame(dxSource = -1, dySource = -2),
         IdleFrame(dxSource = 0, dySource = -1),
+    )
+
+    /**
+     * Uniform swell. Shares [BREATHE]'s six-step, three-shape structure — the extremes held
+     * for two steps each, which is what gives the ease without interpolation — but scales
+     * both axes together, so nothing is ever distorted. The small rise stops the growth
+     * reading as the sprite advancing towards the viewer.
+     */
+    private val SETTLE = listOf(
+        IdleFrame(scaleXPermille = 1000, scaleYPermille = 1000, dySource = 0),
+        IdleFrame(scaleXPermille = 1010, scaleYPermille = 1010, dySource = -1),
+        IdleFrame(scaleXPermille = 1020, scaleYPermille = 1020, dySource = -2),
+        IdleFrame(scaleXPermille = 1020, scaleYPermille = 1020, dySource = -2),
+        IdleFrame(scaleXPermille = 1010, scaleYPermille = 1010, dySource = -1),
+        IdleFrame(scaleXPermille = 1000, scaleYPermille = 1000, dySource = 0),
     )
 
     /** How many bitmaps a style needs, before any budget clamping. */

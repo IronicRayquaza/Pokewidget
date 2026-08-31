@@ -65,6 +65,13 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.pokewidgets.app.ACTION_TAP" />
                 <action android:name="com.pokewidgets.app.ACTION_PINNED" />
+                <!--
+                    The hourly live-form tick, from WeatherRefreshScheduler. It arrives as an
+                    explicit intent naming this component, so the filter is documentation
+                    rather than routing; one receiver handles the tick for widgets of every
+                    size, because it redraws by widget id and not by provider.
+                -->
+                <action android:name="com.pokewidgets.app.ACTION_WEATHER" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

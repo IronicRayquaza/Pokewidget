@@ -109,6 +109,48 @@ class IdleAnimatorTest {
     }
 
     @Test
+    fun settleNeverDistortsTheSprite() {
+        // The whole reason SETTLE exists. A 3D render has no reason to change proportion,
+        // so any frame where the axes disagree would look like a stretched photograph —
+        // exactly the artefact BREATHE produces on Gen 6+ art.
+        for (frame in IdleStyle.SETTLE.frames) {
+            assertEquals(
+                "SETTLE must scale both axes together",
+                frame.scaleXPermille,
+                frame.scaleYPermille,
+            )
+        }
+        assertTrue(
+            "but it still has to actually move",
+            IdleStyle.SETTLE.frames.distinctBy { it.shapeKey }.size > 1,
+        )
+    }
+
+    @Test
+    fun autoPicksTheIdleThatSuitsTheArtwork() {
+        // Pixel-art sets breathe; rendered ones swell.
+        assertEquals(
+            IdleStyle.SETTLE,
+            IdleAnimator.resolve(IdleStyle.AUTO, "versions_generation_ix_scarlet_violet"),
+        )
+        assertEquals(IdleStyle.SETTLE, IdleAnimator.resolve(IdleStyle.AUTO, "other_home"))
+        assertEquals(
+            IdleStyle.BREATHE,
+            IdleAnimator.resolve(IdleStyle.AUTO, "versions_generation_iii_emerald"),
+        )
+        // Generation is the wrong axis: the Gen 7 and 8 icon sets are pixel art.
+        assertEquals(
+            IdleStyle.BREATHE,
+            IdleAnimator.resolve(IdleStyle.AUTO, "versions_generation_viii_icons"),
+        )
+        // An explicit choice is never overridden, whatever the set.
+        for (style in IdleStyle.entries) {
+            if (style == IdleStyle.AUTO) continue
+            assertEquals(style, IdleAnimator.resolve(style, "other_home"))
+        }
+    }
+
+    @Test
     fun everyStyleLoopsInUnderTwoSeconds() {
         // An idle that takes longer than this stops reading as a living thing and starts
         // reading as a widget that has frozen.

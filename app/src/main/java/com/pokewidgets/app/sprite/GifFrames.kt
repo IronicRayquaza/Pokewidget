@@ -55,8 +55,11 @@ object GifFrames {
         val frames = ArrayList<Bitmap>(parts.size)
         val delays = ArrayList<Int>(parts.size)
         for ((index, bytes) in parts.withIndex()) {
-            // Each part is one still frame; a composite set is never itself a GIF.
+            // Each part is one still frame; a composite set is never itself a GIF, and its
+            // parts are plain PNGs, so only the first frame of each is wanted even in the
+            // theoretical case that one turned out to be animated.
             val decoded = decodeStill(bytes) ?: continue
+            decoded.frames.drop(1).forEach { it.recycle() }
             frames.add(decoded.frames.first())
             delays.add(delaysMs.getOrNull(index) ?: DEFAULT_COMPOSITE_DELAY_MS)
         }
@@ -76,7 +79,21 @@ object GifFrames {
         return DecodedSprite(frames, delays)
     }
 
+    /**
+     * A single-file, non-GIF sprite.
+     *
+     * Sniffs for APNG rather than trusting the set's declared extension, because an APNG's
+     * extension *is* `.png`. Deciding by name would fail silently in the worst direction:
+     * `BitmapFactory` reads an animated PNG's first frame without complaint, so the sprite
+     * would quietly lose its real animation and be given a generated idle instead, with
+     * nothing anywhere to say so.
+     */
     private fun decodeStill(bytes: ByteArray): DecodedSprite? {
+        if (ApngFrames.isApng(bytes)) {
+            ApngFrames.decode(bytes)?.let { return it }
+            // A malformed APNG still has a valid first frame; one frame beats none.
+            Log.w(TAG, "APNG did not decode; falling back to its first frame")
+        }
         val opts = BitmapFactory.Options().apply {
             inPreferredConfig = Bitmap.Config.ARGB_8888
             inScaled = false

@@ -13,7 +13,10 @@ import android.view.View
 import android.widget.RemoteViews
 import com.pokewidgets.app.R
 import com.pokewidgets.app.catalog.CatalogRepository
+import com.pokewidgets.app.catalog.FormRules
 import com.pokewidgets.app.catalog.SpriteSet
+import com.pokewidgets.app.data.SpriteFetch
+import com.pokewidgets.app.data.WeatherSource
 import com.pokewidgets.app.data.SpriteSource
 import com.pokewidgets.app.data.TapAction
 import com.pokewidgets.app.data.WidgetConfig
@@ -98,10 +101,32 @@ class WidgetRenderer(private val context: Context) {
      * callback, a resize, or the config activity.
      */
     private suspend fun resolveConfig(widgetId: Int): WidgetConfig {
-        if (configStore.exists(widgetId)) return configStore.get(widgetId)
-        val pending = configStore.takePendingPin() ?: return configStore.get(widgetId)
-        configStore.put(widgetId, pending)
-        return pending
+        val stored = if (configStore.exists(widgetId)) {
+            configStore.get(widgetId)
+        } else {
+            configStore.takePendingPin()
+                ?.also { configStore.put(widgetId, it) }
+                ?: configStore.get(widgetId)
+        }
+        return withLiveForm(stored)
+    }
+
+    /**
+     * Swaps in the form the real world calls for, when the widget asked for that.
+     *
+     * Deliberately *not* persisted: the stored config keeps the Pokémon the user chose, and
+     * the substitution happens fresh on every render. Writing the resolved form back would
+     * mean a widget configured as "Castform" silently became "Castform (Rainy)" the first
+     * time it rained, and the user's original choice would be gone.
+     */
+    private suspend fun withLiveForm(config: WidgetConfig): WidgetConfig {
+        if (!config.liveForm || !FormRules.appliesTo(config.pokemonId)) return config
+        val weather = WeatherSource(context)
+        // Refresh opportunistically: a render is already happening, the reading is an hour
+        // old at most, and this is the app's only chance to notice the sky changed.
+        if (weather.isStale()) weather.refresh()
+        val formId = FormRules.formFor(config.pokemonId, weather.worldState())
+        return if (formId == config.pokemonId) config else config.copy(pokemonId = formId)
     }
 
     /**
@@ -144,8 +169,15 @@ class WidgetRenderer(private val context: Context) {
         val set = catalog.set(config.setId)
             ?: return statusViews(widgetId, config, "Sprite set unavailable")
 
-        val parts = source.spriteParts(set, config.spriteKey)
-            ?: return statusViews(
+        // Missing and Offline mean opposite things to the person looking at the widget: one
+        // is "pick a different set", the other is "try again in a minute". Saying the wrong
+        // one is how a widget ends up being tapped forever with no hope of recovering.
+        val parts = when (val fetched = source.spriteParts(set, config.spriteKey)) {
+            is SpriteFetch.Ok -> fetched.parts
+            SpriteFetch.Missing -> return statusViews(
+                widgetId, config, "${set.label} never drew this one",
+            )
+            SpriteFetch.Offline -> return statusViews(
                 widgetId,
                 config,
                 if (source.isSpriteCached(config.spriteKey, set.ext)) {
@@ -154,6 +186,7 @@ class WidgetRenderer(private val context: Context) {
                     "Tap to retry — no connection"
                 },
             )
+        }
 
         val decoded = GifFrames.decode(parts, isGif = set.ext == "gif", delaysMs = set.frameDelaysMs)
             ?: return statusViews(widgetId, config, "Couldn't decode sprite")
@@ -286,7 +319,9 @@ class WidgetRenderer(private val context: Context) {
         val source = decoded.frames.firstOrNull() ?: return
         // Leave room for the widest step, so a breath does not clip at the edges of a
         // snugly-fitted widget.
-        val style = config.idleStyle
+        // AUTO means "whatever suits this set's artwork" — a squash-and-stretch breath on
+        // pixel art, a shape-preserving swell on a 3D render.
+        val style = IdleAnimator.resolve(config.idleStyle, config.setId)
         val widest = style.frames.maxOfOrNull { it.scaleXPermille } ?: IdleFrame.NATURAL
         val tallest = style.frames.maxOfOrNull { it.scaleYPermille } ?: IdleFrame.NATURAL
         val scale = FramePlanner.fitScale(

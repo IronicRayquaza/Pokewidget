@@ -11,17 +11,21 @@ import com.pokewidgets.app.catalog.CatalogRepository
 import com.pokewidgets.app.catalog.PokemonEntry
 import com.pokewidgets.app.catalog.SpriteKey
 import com.pokewidgets.app.catalog.SpriteSet
+import com.pokewidgets.app.data.Place
 import com.pokewidgets.app.data.SpriteSource
+import com.pokewidgets.app.data.WeatherSource
 import com.pokewidgets.app.data.WidgetConfig
 import com.pokewidgets.app.data.WidgetConfigStore
 import com.pokewidgets.app.widget.CryPlayer
 import com.pokewidgets.app.widget.PokemonWidgetProvider
 import com.pokewidgets.app.widget.WidgetActions
+import com.pokewidgets.app.widget.WeatherRefreshScheduler
 import com.pokewidgets.app.widget.WidgetRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,6 +58,11 @@ data class MainUiState(
     val placed: List<PlacedWidget> = emptyList(),
     val cacheBytes: Long = 0,
     val canPin: Boolean = false,
+    /** The city live forms take their weather from, if one has been chosen. */
+    val weatherPlace: Place? = null,
+    val placeQuery: String = "",
+    val placeResults: List<Place> = emptyList(),
+    val searchingPlaces: Boolean = false,
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -61,6 +70,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val catalog = CatalogRepository.get(app)
     private val source = SpriteSource(app)
     private val store = WidgetConfigStore(app)
+    private val weather = WeatherSource(app)
 
     private val _state = MutableStateFlow(MainUiState())
     val state: StateFlow<MainUiState> = _state.asStateFlow()
@@ -78,6 +88,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private var cryJob: Job? = null
 
+    /** Debounces city search the same way the Pokémon query is debounced. */
+    private var placeJob: Job? = null
+
     init {
         viewModelScope.launch {
             allPokemon.value = catalog.pokemon()
@@ -91,6 +104,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             refreshPlaced()
             refreshCacheSize()
+            refreshWeatherPlace()
         }
         observeFilters()
     }
@@ -228,6 +242,47 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { source.clearCache() }
             refreshCacheSize()
+        }
+    }
+
+    // ---- Weather, for live forms -------------------------------------------------
+
+    fun refreshWeatherPlace() {
+        viewModelScope.launch { _state.update { it.copy(weatherPlace = weather.place()) } }
+    }
+
+    fun searchPlaces(query: String) {
+        _state.update { it.copy(placeQuery = query) }
+        placeJob?.cancel()
+        if (query.isBlank()) {
+            _state.update { it.copy(placeResults = emptyList(), searchingPlaces = false) }
+            return
+        }
+        placeJob = viewModelScope.launch {
+            delay(QUERY_DEBOUNCE_MS * 3)
+            _state.update { it.copy(searchingPlaces = true) }
+            val results = weather.searchPlaces(query)
+            _state.update { it.copy(placeResults = results, searchingPlaces = false) }
+        }
+    }
+
+    /**
+     * Choosing a place fetches immediately rather than waiting for the hourly alarm, so the
+     * setting visibly does something. Every live-form widget is then re-rendered, because
+     * they were drawing against whatever sky was cached for the old place.
+     */
+    fun choosePlace(place: Place?) {
+        viewModelScope.launch {
+            weather.setPlace(place)
+            if (place != null) weather.refresh()
+            _state.update {
+                it.copy(weatherPlace = place, placeQuery = "", placeResults = emptyList())
+            }
+            WeatherRefreshScheduler.sync(getApplication())
+            val renderer = WidgetRenderer(getApplication())
+            for (id in store.knownWidgetIds()) {
+                if (store.get(id).liveForm) renderer.render(id)
+            }
         }
     }
 

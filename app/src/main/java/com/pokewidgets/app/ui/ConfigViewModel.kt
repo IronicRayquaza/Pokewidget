@@ -8,8 +8,10 @@ import com.pokewidgets.app.catalog.PokemonEntry
 import com.pokewidgets.app.catalog.SpriteKey
 import com.pokewidgets.app.catalog.SpriteSet
 import com.pokewidgets.app.data.SpriteSource
+import com.pokewidgets.app.data.WeatherSource
 import com.pokewidgets.app.data.WidgetConfig
 import com.pokewidgets.app.data.WidgetConfigStore
+import com.pokewidgets.app.widget.WeatherRefreshScheduler
 import com.pokewidgets.app.widget.WidgetRenderer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +37,8 @@ data class ConfigUiState(
     val allPokemon: List<PokemonEntry> = emptyList(),
     val previewUrl: String? = null,
     val warning: String? = null,
+    /** The city weather is taken from, or null when none has been chosen in Settings. */
+    val weatherPlace: String? = null,
 )
 
 class ConfigViewModel(app: Application) : AndroidViewModel(app) {
@@ -42,6 +46,7 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
     private val catalog = CatalogRepository.get(app)
     private val source = SpriteSource(app)
     private val store = WidgetConfigStore(app)
+    private val weather = WeatherSource(app)
 
     private val _state = MutableStateFlow(ConfigUiState())
     val state: StateFlow<ConfigUiState> = _state.asStateFlow()
@@ -91,7 +96,20 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     (sets.firstOrNull { it.animated } ?: sets.firstOrNull())?.id ?: current.config.setId
                 }
-                current.copy(config = current.config.copy(pokemonId = pokemonId, setId = nextSet))
+                // Variants were carried across a Pokémon change untouched, so turning on
+                // Female for a Pokémon that has one and then switching to one that does not
+                // left an unrenderable key in the store. Re-check against the new Pokémon.
+                val target = sets.firstOrNull { it.id == nextSet }
+                val c = current.config
+                current.copy(
+                    config = c.copy(
+                        pokemonId = pokemonId,
+                        setId = nextSet,
+                        back = c.back && target?.covers(pokemonId, true, c.shiny, c.female, c.style) == true,
+                        shiny = c.shiny && target?.covers(pokemonId, c.back, true, c.female, c.style) == true,
+                        female = c.female && target?.covers(pokemonId, c.back, c.shiny, true, c.style) == true,
+                    ),
+                )
             }
             refreshDerived()
         }
@@ -108,9 +126,9 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
                 current.copy(
                     config = c.copy(
                         setId = setId,
-                        back = c.back && set.supports(true, c.shiny, c.female, c.style),
-                        shiny = c.shiny && set.supports(c.back, true, c.female, c.style),
-                        female = c.female && set.supports(c.back, c.shiny, true, c.style),
+                        back = c.back && set.covers(c.pokemonId, true, c.shiny, c.female, c.style),
+                        shiny = c.shiny && set.covers(c.pokemonId, c.back, true, c.female, c.style),
+                        female = c.female && set.covers(c.pokemonId, c.back, c.shiny, true, c.style),
                         style = c.style?.takeIf { set.variants.keys.any { k -> k.contains(it) } },
                     ),
                 )
@@ -126,7 +144,13 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
             .sortedWith(compareByDescending<SpriteSet> { it.animated }.thenBy { it.order })
         val set = catalog.set(config.setId)
 
-        val supported = set?.supports(config.back, config.shiny, config.female, config.style) == true
+        val supported =
+            set?.covers(config.pokemonId, config.back, config.shiny, config.female, config.style) == true
+        // Null means this set never drew this Pokémon in any variant — a different message
+        // from "it has no shiny of it", and the only fix is a different set.
+        val drawsAtAll = set?.resolveVariant(
+            config.pokemonId, config.back, config.shiny, config.female, config.style,
+        ) != null
         val url = set?.let { source.spriteUrl(it, config.spriteKey) }
 
         // Preview each set in the variant the user has chosen where it has one, and in
@@ -139,16 +163,22 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
             SetPreview(candidate, previewUrl)
         }
 
+        val place = weather.place()?.label
+
         _state.update {
             it.copy(
                 entry = entry,
+                weatherPlace = place,
                 availableSets = sets,
                 availableSetPreviews = previews,
                 selectedSet = set,
                 previewUrl = url,
                 warning = when {
                     set == null -> "That sprite set is no longer available."
-                    !supported -> "${set.label} has no ${variantLabel(config)} sprite for this Pokémon."
+                    !drawsAtAll -> "${set.label} never drew this Pokémon — pick another set."
+                    !supported ->
+                        "${set.label} has no ${variantLabel(config)} sprite for this Pokémon, " +
+                            "so the widget will show the standard one."
                     !set.animated -> null
                     else -> null
                 },
@@ -167,6 +197,9 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val config = _state.value.config.copy(excitedUntilMs = 0L)
             store.put(widgetId, config)
+            // Turning a live form on is what creates the app's only recurring job, and
+            // turning the last one off is what removes it.
+            WeatherRefreshScheduler.sync(getApplication())
             WidgetRenderer(getApplication()).render(widgetId)
             onDone()
         }

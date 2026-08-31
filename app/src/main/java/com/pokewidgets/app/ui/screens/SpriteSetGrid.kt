@@ -174,9 +174,11 @@ private fun SpriteSetCell(preview: SetPreview, selected: Boolean, onClick: () ->
 /**
  * Marks the sets that genuinely move on the home screen.
  *
- * This is the single most useful fact on the card: seven of the app's sets ship real
+ * This is the single most useful fact on the card: a minority of the app's sets ship real
  * animation and the rest are stills that PokéWidget animates procedurally, and the
- * difference is invisible in a static preview grid.
+ * difference is invisible in a static preview grid. (The exact count is deliberately not
+ * written down here — it changed once already, and a number in a comment drifts silently.
+ * `SpriteSetIndexTest` asserts the floor instead.)
  */
 @Composable
 private fun AnimatedBadge(modifier: Modifier = Modifier) {
