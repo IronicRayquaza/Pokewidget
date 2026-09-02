@@ -1,5 +1,6 @@
 package com.pokewidgets.app.ui.screens
 
+import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -15,15 +16,25 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pokewidgets.app.catalog.Weather
 import com.pokewidgets.app.data.Place
+import com.pokewidgets.app.data.Reading
 import com.pokewidgets.app.ui.components.Caption
 import com.pokewidgets.app.ui.components.PokeButton
 import com.pokewidgets.app.ui.components.PokeHeader
@@ -40,11 +51,17 @@ fun SettingsScreen(
     onClearCache: () -> Unit,
     onBack: () -> Unit,
     weatherPlace: Place? = null,
+    weatherReading: Reading? = null,
+    checkingWeather: Boolean = false,
+    onCheckWeather: () -> Unit = {},
     placeQuery: String = "",
     placeResults: List<Place> = emptyList(),
     searchingPlaces: Boolean = false,
     onPlaceQuery: (String) -> Unit = {},
     onChoosePlace: (Place?) -> Unit = {},
+    crashReport: String? = null,
+    onClearCrash: () -> Unit = {},
+    message: String? = null,
 ) {
     BackHandler(onBack = onBack)
 
@@ -63,6 +80,13 @@ fun SettingsScreen(
                 .navigationBarsPadding()
                 .padding(horizontal = 16.dp),
         ) {
+            // Page level rather than inside a section: the things that set it are spread
+            // across the app, and it used to be the case that any of them simply closed it.
+            if (message != null) {
+                Panel { Caption(message) }
+                Spacer(Modifier.height(16.dp))
+            }
+
             Panel {
                 SectionHeader("Sprite cache")
                 Text(
@@ -107,15 +131,31 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Ink,
                             )
-                            Caption("Checked about once an hour")
+                            // The reading, not just the city. Live forms are otherwise
+                            // invisible until a widget happens to redraw, which makes
+                            // "it isn't working" and "it hasn't checked yet" look identical.
+                            Caption(
+                                when {
+                                    checkingWeather -> "Checking…"
+                                    weatherReading != null -> describe(weatherReading)
+                                    else -> "Not checked yet"
+                                },
+                            )
                         }
                         Spacer(Modifier.width(12.dp))
                         PokeButton(
-                            text = "Change",
-                            onClick = { onChoosePlace(null) },
+                            text = "Check now",
+                            onClick = onCheckWeather,
                             container = CardColor,
+                            enabled = !checkingWeather,
                         )
                     }
+                    Spacer(Modifier.height(10.dp))
+                    PokeButton(
+                        text = "Change city",
+                        onClick = { onChoosePlace(null) },
+                        container = CardColor,
+                    )
                 } else {
                     PokeSearchField(
                         value = placeQuery,
@@ -140,6 +180,11 @@ fun SettingsScreen(
                 }
             }
 
+            if (crashReport != null) {
+                Spacer(Modifier.height(16.dp))
+                Panel { CrashPanel(crashReport, onClearCrash) }
+            }
+
             Spacer(Modifier.height(16.dp))
 
             Panel {
@@ -159,6 +204,69 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(32.dp))
         }
+    }
+}
+
+/**
+ * The sky in words, so the person can predict what a live form will do without waiting for
+ * a widget to redraw and guessing at the result.
+ */
+private fun describe(reading: Reading): String {
+    val sky = when (reading.weather) {
+        Weather.CLEAR -> "Clear"
+        Weather.CLOUDY -> "Cloudy"
+        Weather.RAIN -> "Rain"
+        Weather.SNOW -> "Snow"
+    }
+    val part = if (reading.isDay) "daytime" else "night"
+    val checked = DateUtils.getRelativeTimeSpanString(
+        reading.takenAtMs,
+        System.currentTimeMillis(),
+        DateUtils.MINUTE_IN_MILLIS,
+    )
+    return "$sky, $part — checked $checked"
+}
+
+/**
+ * The last crash, offered as text to copy.
+ *
+ * Absent on a healthy install, which is why the whole panel is conditional rather than
+ * showing "no crashes": a diagnostics section nobody needs is just clutter on a settings
+ * page. This exists because the app is sideloaded to people with no `adb` and no crash
+ * reporting behind it, so without it a crash arrives as "it closed" and dies there.
+ */
+@Composable
+private fun CrashPanel(report: String, onClear: () -> Unit) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+
+    SectionHeader("Last crash")
+    Caption(
+        "The app closed unexpectedly. Copying this and sending it is the single most " +
+            "useful thing you can do about it — it is stored only on this phone and is " +
+            "sent nowhere on its own.",
+    )
+    Spacer(Modifier.height(10.dp))
+    Text(
+        report.lineSequence().take(6).joinToString("\n"),
+        style = MaterialTheme.typography.bodySmall,
+        color = Ink,
+        maxLines = 6,
+        overflow = TextOverflow.Ellipsis,
+    )
+    Spacer(Modifier.height(12.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        PokeButton(
+            text = if (copied) "Copied" else "Copy report",
+            onClick = {
+                clipboard.setText(AnnotatedString(report))
+                copied = true
+            },
+            icon = Icons.Default.ContentCopy,
+            container = CardColor,
+        )
+        Spacer(Modifier.width(10.dp))
+        PokeButton(text = "Clear", onClick = onClear, container = CardColor)
     }
 }
 

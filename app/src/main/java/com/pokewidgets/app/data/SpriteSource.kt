@@ -12,7 +12,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 
 /**
  * What [SpriteSource.spriteParts] found.
@@ -44,19 +43,12 @@ class SpriteSource(context: Context) {
 
     private val appContext = context.applicationContext
 
-    private val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            // Renders triggered by a tap or an update run inside a broadcast receiver's
-            // goAsync() window, which Android grants roughly ten seconds. An unbounded call
-            // outlives it and finishes in a process the system is free to kill, so the work
-            // is lost with no error to show. Bounding the whole call means a bad network
-            // fails fast enough to report "no connection" — which the tap can now retry.
-            .callTimeout(25, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .build()
-    }
+    // Shared, not per-instance. This class is constructed fresh on every tap and every render;
+    // see the note in [Http] for what a client each cost. The 25 s call timeout lives there
+    // and exists because renders and taps run inside a broadcast receiver's goAsync() window:
+    // an unbounded call outlives it and finishes in a process the system is free to kill, so
+    // the work is lost with no error to show.
+    private val client: OkHttpClient get() = Http.files
 
     private val spriteDir = File(appContext.filesDir, "sprites").apply { mkdirs() }
     private val cryDir = File(appContext.filesDir, "cries").apply { mkdirs() }
@@ -193,15 +185,35 @@ class SpriteSource(context: Context) {
      * giving up.
      */
     suspend fun cryFile(pokemonId: Int, legacy: Boolean): File? {
-        val flavours = if (legacy) listOf("legacy", "latest") else listOf("latest", "legacy")
-        for (flavour in flavours) {
+        for (flavour in flavours(legacy)) {
             cry(pokemonId, flavour)?.let { return it }
         }
         return null
     }
 
+    /**
+     * The cry, but only if it is already on disk. Never touches the network.
+     *
+     * This exists because [cryFile] can spend a very long time: two flavours by two hosts is
+     * four HTTP calls, each bounded at 25 s, and a widget tap has roughly *ten* before Android
+     * declares the app unresponsive. The tap path asks this question first and treats a miss as
+     * "not this time" rather than waiting — see `CryPlayer`, which starts the download on its
+     * own scope so the next tap is instant.
+     */
+    fun cachedCry(pokemonId: Int, legacy: Boolean): File? =
+        flavours(legacy)
+            .map { cryPath(pokemonId, it) }
+            .firstOrNull { it.isFile && it.length() > 0 }
+
+    /** Preference order; see [cryFile] for why the other flavour is always tried too. */
+    private fun flavours(legacy: Boolean): List<String> =
+        if (legacy) listOf("legacy", "latest") else listOf("latest", "legacy")
+
+    private fun cryPath(pokemonId: Int, flavour: String): File =
+        File(cryDir, "$flavour-$pokemonId.ogg")
+
     private suspend fun cry(pokemonId: Int, flavour: String): File? {
-        val file = File(cryDir, "$flavour-$pokemonId.ogg")
+        val file = cryPath(pokemonId, flavour)
         if (file.isFile && file.length() > 0) return file
 
         val id = "$flavour/$pokemonId"

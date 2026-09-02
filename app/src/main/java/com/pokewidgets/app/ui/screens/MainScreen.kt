@@ -79,6 +79,8 @@ fun MainScreen(
     onClearCache: () -> Unit,
     onPlaceQuery: (String) -> Unit,
     onChoosePlace: (Place?) -> Unit,
+    onCheckWeather: () -> Unit,
+    onClearCrash: () -> Unit,
     onPlayCry: (Int) -> Unit,
 ) {
     var showSettings by remember { mutableStateOf(false) }
@@ -99,11 +101,17 @@ fun MainScreen(
             onClearCache = onClearCache,
             onBack = { showSettings = false },
             weatherPlace = state.weatherPlace,
+            weatherReading = state.weatherReading,
+            checkingWeather = state.checkingWeather,
+            onCheckWeather = onCheckWeather,
             placeQuery = state.placeQuery,
             placeResults = state.placeResults,
             searchingPlaces = state.searchingPlaces,
             onPlaceQuery = onPlaceQuery,
             onChoosePlace = onChoosePlace,
+            crashReport = state.crashReport,
+            onClearCrash = onClearCrash,
+            message = state.message,
         )
 
         else -> BrowseScreen(

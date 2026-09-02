@@ -27,7 +27,6 @@ import okhttp3.Request
 import java.io.IOException
 import java.net.URLEncoder
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 
 /** A place the user chose to take the weather from. */
 data class Place(val label: String, val latitude: Double, val longitude: Double)
@@ -54,15 +53,11 @@ class WeatherSource(context: Context) {
     private val appContext = context.applicationContext
     private val store = appContext.weatherDataStore
 
-    private val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(8, TimeUnit.SECONDS)
-            // Weather is a nicety, and this can run inside a broadcast receiver's window. A
-            // reading that has not arrived in ten seconds is worth less than the render is.
-            .callTimeout(10, TimeUnit.SECONDS)
-            .build()
-    }
+    // Shared, not per-instance: WidgetRenderer builds a WeatherSource on every render of a
+    // live-form widget. The timeouts live in [Http] — weather is a nicety, and this can run
+    // inside a broadcast receiver window, so a reading that has not arrived in ten seconds is
+    // worth less than the render waiting on it.
+    private val client: OkHttpClient get() = Http.json
 
     private val json = Json { ignoreUnknownKeys = true }
 

@@ -13,8 +13,8 @@ android {
         applicationId = "com.pokewidgets.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -93,10 +93,25 @@ android {
      *
      * The remaining pins are load-bearing for the *build*, not the runtime: AGP 7.4.1's
      * D8 throws `NullPointerException` while dexing `vectordrawable` 1.2.0,
-     * `vectordrawable-animated` 1.2.0 and `profileinstaller` 1.4.1. Each is held at the
-     * version its own consumer declares — Compose UI 1.7.6 requires exactly
-     * `profileinstaller:1.3.1`, AppCompat 1.6.1 shipped against `vectordrawable:1.1.0` —
-     * so none of them is pinned below a stated requirement.
+     * `vectordrawable-animated` 1.2.0, `profileinstaller` 1.4.1 and
+     * `lifecycle-livedata-core` 2.8.7 —
+     *
+     *     D8: java.lang.NullPointerException: Cannot invoke "String.length()"
+     *     because "<parameter1>" is null
+     *
+     * — so removing any of them fails `mergeExtDexDebug` rather than shipping something
+     * broken, which is the failure mode to prefer. Each is held at the version its own
+     * consumer declares: Compose UI 1.7.6 requires exactly `profileinstaller:1.3.1`,
+     * AppCompat 1.6.1 shipped against `vectordrawable:1.1.0`.
+     *
+     * `livedata` is the exception that proves the rule above, so it is spelled out. It is
+     * genuinely held *below* what the 2.8.7 lifecycle modules ask for, because D8 cannot
+     * dex 2.8.7 at all — but all three livedata artifacts are pinned **together**, so the
+     * family is internally consistent. Pinning only two of them, as this block did until
+     * now, left `livedata-core-ktx` at 2.8.7 against a 2.7.0 `livedata-core`: a split
+     * classpath of exactly the shape the second bullet describes, left behind by the fix
+     * for it. Nothing in this app touches `LiveData` directly; it arrives only through
+     * `SavedStateHandle`, which is why the mismatch had not yet cost anything.
      */
     configurations.all {
         resolutionStrategy {
@@ -107,7 +122,9 @@ android {
             force("androidx.profileinstaller:profileinstaller:1.3.1")
             force("androidx.vectordrawable:vectordrawable:1.1.0")
             force("androidx.vectordrawable:vectordrawable-animated:1.1.0")
+            // The whole livedata family, together. See the note above.
             force("androidx.lifecycle:lifecycle-livedata-core:2.7.0")
+            force("androidx.lifecycle:lifecycle-livedata-core-ktx:2.7.0")
             force("androidx.lifecycle:lifecycle-livedata:2.7.0")
         }
     }

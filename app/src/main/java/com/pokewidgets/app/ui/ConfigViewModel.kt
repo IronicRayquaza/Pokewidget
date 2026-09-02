@@ -1,6 +1,7 @@
 package com.pokewidgets.app.ui
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pokewidgets.app.catalog.CatalogRepository
@@ -192,16 +193,34 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
         if (config.female) add("female")
     }.joinToString(" ").ifEmpty { "front" }
 
-    /** Persists the config and pushes the first render. */
+    /**
+     * Persists the config and pushes the first render.
+     *
+     * The write is the only step that must succeed; the alarm and the render are guarded
+     * separately so neither can strand the user on this screen — or, as happened on the
+     * matching path in `MainViewModel.choosePlace`, close the app outright. `onDone()` runs
+     * either way, because the settings *were* saved and the screen has no reason to stay
+     * open. A widget that failed to draw shows its own message and retries on tap.
+     */
     fun save(onDone: () -> Unit) {
         viewModelScope.launch {
             val config = _state.value.config.copy(excitedUntilMs = 0L)
-            store.put(widgetId, config)
-            // Turning a live form on is what creates the app's only recurring job, and
-            // turning the last one off is what removes it.
-            WeatherRefreshScheduler.sync(getApplication())
-            WidgetRenderer(getApplication()).render(widgetId)
+            val saved = runCatching { store.put(widgetId, config) }
+                .onFailure { Log.e(TAG, "could not save widget $widgetId", it) }
+                .isSuccess
+            if (saved) {
+                // Turning a live form on is what creates the app's only recurring job, and
+                // turning the last one off is what removes it.
+                runCatching { WeatherRefreshScheduler.sync(getApplication()) }
+                    .onFailure { Log.w(TAG, "could not sync the weather alarm", it) }
+                runCatching { WidgetRenderer(getApplication()).render(widgetId) }
+                    .onFailure { Log.e(TAG, "first render failed for widget $widgetId", it) }
+            }
             onDone()
         }
+    }
+
+    private companion object {
+        const val TAG = "ConfigViewModel"
     }
 }

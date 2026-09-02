@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Three concrete providers so the launcher's widget picker offers size presets. They
@@ -157,8 +158,13 @@ sealed class PokemonWidgetProvider : AppWidgetProvider() {
      * Widgets get a click callback and nothing else — no touch-down, no gestures — so
      * every interaction is funnelled through this one broadcast.
      *
-     * `goAsync()` holds the receiver alive for the work; a cry is ~1 s of audio, well
-     * inside the ~10 s a broadcast receiver is granted.
+     * `goAsync()` holds the receiver alive for the work, and Android grants it roughly ten
+     * seconds before declaring the app unresponsive. **Nothing on this path is allowed to
+     * outlive that**, which is what [TAP_BUDGET_MS] enforces and what `pending.finish()` in
+     * the `finally` guarantees. Both halves of the work here can be slow on a cold cache —
+     * the cry fetch and the "this widget is showing an error, re-render it" branch each go
+     * to the network — and before the budget existed a tap on a widget with no cached art
+     * could sit in `SpriteSource` for the better part of a minute and produce an ANR.
      */
     private fun handleTap(context: Context, intent: Intent) {
         val widgetId = intent.getIntExtra(
@@ -170,52 +176,8 @@ sealed class PokemonWidgetProvider : AppWidgetProvider() {
         val appContext = context.applicationContext
         scope.launch {
             try {
-                val store = WidgetConfigStore(appContext)
-                val config = store.get(widgetId)
-
-                // A widget with no cached art is not showing a Pokémon — it is showing an
-                // error, and the only thing its owner can mean by tapping it is "try again".
-                // Honour that before the configured action, whatever that action is: the
-                // default is CRY, which never re-renders, so without this a widget that
-                // failed once stayed broken until a reboot. SpriteSource remembers confirmed
-                // 404s, so a sprite that genuinely does not exist costs no round trip here.
-                if (!SpriteSource(appContext).isSpriteCached(config.spriteKey)) {
-                    WidgetRenderer(appContext).render(widgetId)
-                }
-
-                when (config.tapAction) {
-                    TapAction.CRY -> {
-                        if (config.cryEnabled) CryPlayer.play(appContext, config.pokemonId, config.legacyCry)
-                    }
-
-                    TapAction.SHINY -> {
-                        store.update(widgetId) { it.copy(shiny = !it.shiny) }
-                        WidgetRenderer(appContext).render(widgetId)
-                    }
-
-                    TapAction.FLIP -> {
-                        store.update(widgetId) { it.copy(back = !it.back) }
-                        WidgetRenderer(appContext).render(widgetId)
-                    }
-
-                    TapAction.EXCITE -> {
-                        val until = System.currentTimeMillis() + EXCITED_DURATION_MS
-                        store.update(widgetId) { it.copy(excitedUntilMs = until) }
-                        WidgetRenderer(appContext).render(widgetId)
-                        if (config.cryEnabled) CryPlayer.play(appContext, config.pokemonId, config.legacyCry)
-                        // Settle back to the normal rate once the burst is over.
-                        WidgetUpdater.requestDelayed(appContext, widgetId, EXCITED_DURATION_MS)
-                    }
-
-                    TapAction.OPEN_APP -> {
-                        val launch = appContext.packageManager
-                            .getLaunchIntentForPackage(appContext.packageName)
-                            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        launch?.let { appContext.startActivity(it) }
-                    }
-
-                    TapAction.NONE -> Unit
-                }
+                withTimeoutOrNull(TAP_BUDGET_MS) { runTap(appContext, widgetId) }
+                    ?: Log.w(TAG, "tap on widget $widgetId ran past its ${TAP_BUDGET_MS}ms budget")
             } catch (e: Exception) {
                 Log.e(TAG, "tap handling failed for widget $widgetId", e)
             } finally {
@@ -224,9 +186,76 @@ sealed class PokemonWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * The tap itself, minus the receiver bookkeeping. Split out so the timeout in
+     * [handleTap] wraps the work and not the `finish()` that must happen regardless.
+     */
+    private suspend fun runTap(appContext: Context, widgetId: Int) {
+        val store = WidgetConfigStore(appContext)
+        val config = store.get(widgetId)
+
+        // A widget with no cached art is not showing a Pokémon — it is showing an error,
+        // and the only thing its owner can mean by tapping it is "try again". Honour that
+        // before the configured action, whatever that action is: the default is CRY, which
+        // never re-renders, so without this a widget that failed once stayed broken until a
+        // reboot. SpriteSource remembers confirmed 404s, so a sprite that genuinely does not
+        // exist costs no round trip here.
+        if (!SpriteSource(appContext).isSpriteCached(config.spriteKey)) {
+            WidgetRenderer(appContext).render(widgetId)
+        }
+
+        when (config.tapAction) {
+            // join() so the receiver stays alive for the sound, but the cry itself runs on
+            // CryPlayer's own scope — so when the tap budget expires the join is abandoned
+            // and the cry is not, and a second tap cancels the first rather than layering.
+            TapAction.CRY -> {
+                if (config.cryEnabled) {
+                    CryPlayer.play(appContext, config.pokemonId, config.legacyCry).join()
+                }
+            }
+
+            TapAction.SHINY -> {
+                store.update(widgetId) { it.copy(shiny = !it.shiny) }
+                WidgetRenderer(appContext).render(widgetId)
+            }
+
+            TapAction.FLIP -> {
+                store.update(widgetId) { it.copy(back = !it.back) }
+                WidgetRenderer(appContext).render(widgetId)
+            }
+
+            TapAction.EXCITE -> {
+                val until = System.currentTimeMillis() + EXCITED_DURATION_MS
+                store.update(widgetId) { it.copy(excitedUntilMs = until) }
+                WidgetRenderer(appContext).render(widgetId)
+                if (config.cryEnabled) {
+                    CryPlayer.play(appContext, config.pokemonId, config.legacyCry).join()
+                }
+                // Settle back to the normal rate once the burst is over.
+                WidgetUpdater.requestDelayed(appContext, widgetId, EXCITED_DURATION_MS)
+            }
+
+            TapAction.OPEN_APP -> {
+                val launch = appContext.packageManager
+                    .getLaunchIntentForPackage(appContext.packageName)
+                    ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                launch?.let { appContext.startActivity(it) }
+            }
+
+            TapAction.NONE -> Unit
+        }
+    }
+
     companion object {
         private const val TAG = "PokemonWidgetProvider"
         const val EXCITED_DURATION_MS = 2_200L
+
+        /**
+         * The hard ceiling on one tap. Android grants a broadcast receiver roughly ten
+         * seconds before it is declared unresponsive; this leaves margin inside that for
+         * the `finish()` and for a slow device.
+         */
+        private const val TAP_BUDGET_MS = 8_000L
 
         /**
          * Broadcast receivers are torn down as soon as they return, so the work has to

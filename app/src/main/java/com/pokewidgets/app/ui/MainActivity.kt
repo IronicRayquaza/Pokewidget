@@ -66,6 +66,8 @@ class MainActivity : ComponentActivity() {
                         onClearCache = viewModel::clearCache,
                         onPlaceQuery = viewModel::searchPlaces,
                         onChoosePlace = viewModel::choosePlace,
+                        onCheckWeather = viewModel::checkWeatherNow,
+                        onClearCrash = viewModel::clearCrashReport,
                         onPlayCry = viewModel::playCry,
                     )
                 }

@@ -83,6 +83,11 @@ object WeatherRefreshScheduler {
             .setAction(ACTION_WEATHER)
         val flags = PendingIntent.FLAG_IMMUTABLE or
             if (create) PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_NO_CREATE
-        return PendingIntent.getBroadcast(context, REQUEST_CODE, intent, flags)
+        // Guarded like the alarm itself. Some OEM builds cap how many PendingIntents an app
+        // may hold and throw rather than refuse, and none of this is worth an unhandled
+        // exception on a path the user reached by choosing a city.
+        return runCatching { PendingIntent.getBroadcast(context, REQUEST_CODE, intent, flags) }
+            .onFailure { Log.w(TAG, "could not build the weather alarm intent", it) }
+            .getOrNull()
     }
 }
