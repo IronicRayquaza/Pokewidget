@@ -16,3 +16,10 @@ tools/.cache/
 crash_log.txt
 pid*.log
 *.logcat
+
+# Signing. The keystore lives outside the repo and its passwords are read from
+# `keystore.properties`; see `keystore.properties.example`. On a public repo a leaked
+# signing key is unrecoverable — every future update would have to be a fresh install.
+keystore.properties
+*.jks
+*.keystore

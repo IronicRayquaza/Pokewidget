@@ -1,6 +1,10 @@
 package com.pokewidgets.app.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.text.format.DateUtils
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -29,9 +33,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pokewidgets.app.BuildConfig
+import com.pokewidgets.app.Links
 import com.pokewidgets.app.catalog.Weather
 import com.pokewidgets.app.data.Place
 import com.pokewidgets.app.data.Reading
@@ -64,6 +71,7 @@ fun SettingsScreen(
     message: String? = null,
 ) {
     BackHandler(onBack = onBack)
+    val context = LocalContext.current
 
     Column(
         Modifier
@@ -188,6 +196,32 @@ fun SettingsScreen(
             Spacer(Modifier.height(16.dp))
 
             Panel {
+                SectionHeader("Beta")
+                // A bug report that does not say which build it came from costs a round trip
+                // to establish, and testers are running whatever they last installed rather
+                // than whatever is newest.
+                Caption("Version ${BuildConfig.VERSION_NAME}")
+                // The button is hidden until an invite exists, rather than shipping one that
+                // lands on a Discord error page. See `Links`.
+                if (Links.hasDiscord) {
+                    Spacer(Modifier.height(10.dp))
+                    Caption(
+                        "A sideloaded app cannot update itself, so new versions are announced " +
+                            "in the Discord — along with install help, and somewhere to say " +
+                            "what broke.",
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    PokeButton(
+                        text = "Join the Discord",
+                        onClick = { openLink(context, Links.DISCORD_INVITE) },
+                        container = CardColor,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Panel {
                 SectionHeader("Credits")
                 Caption(
                     "Sprites and cries come from the community PokéAPI mirrors, and the " +
@@ -238,13 +272,21 @@ private fun describe(reading: Reading): String {
 @Composable
 private fun CrashPanel(report: String, onClear: () -> Unit) {
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     var copied by remember { mutableStateOf(false) }
 
     SectionHeader("Last crash")
     Caption(
-        "The app closed unexpectedly. Copying this and sending it is the single most " +
-            "useful thing you can do about it — it is stored only on this phone and is " +
-            "sent nowhere on its own.",
+        if (Links.hasDiscord) {
+            "The app closed unexpectedly. Sending this is the single most useful thing you " +
+                "can do about it — the button below copies the report and opens the Discord, " +
+                "where it goes in #bug-reports. It is stored only on this phone and is sent " +
+                "nowhere on its own."
+        } else {
+            "The app closed unexpectedly. Copying this and sending it is the single most " +
+                "useful thing you can do about it — it is stored only on this phone and is " +
+                "sent nowhere on its own."
+        },
     )
     Spacer(Modifier.height(10.dp))
     Text(
@@ -255,6 +297,22 @@ private fun CrashPanel(report: String, onClear: () -> Unit) {
         overflow = TextOverflow.Ellipsis,
     )
     Spacer(Modifier.height(12.dp))
+    // Copying alone dead-ends: it leaves the report on a clipboard and the tester guessing
+    // where to put it. Copy and open the invite in one tap, so the report is already pasteable
+    // by the time Discord is on screen.
+    if (Links.hasDiscord) {
+        PokeButton(
+            text = "Send in Discord",
+            onClick = {
+                clipboard.setText(AnnotatedString(report))
+                copied = true
+                openLink(context, Links.DISCORD_INVITE)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            container = CardColor,
+        )
+        Spacer(Modifier.height(10.dp))
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         PokeButton(
             text = if (copied) "Copied" else "Copy report",
@@ -268,6 +326,21 @@ private fun CrashPanel(report: String, onClear: () -> Unit) {
         Spacer(Modifier.width(10.dp))
         PokeButton(text = "Clear", onClick = onClear, container = CardColor)
     }
+}
+
+/**
+ * Opens a link, or quietly does nothing.
+ *
+ * A device with nothing registered for `ACTION_VIEW` is rare but real — a stripped ROM, a
+ * locked-down work profile — and an `ActivityNotFoundException` raised here would close the app
+ * from the settings screen, which is the exact failure 1.3 was spent removing.
+ */
+private fun openLink(context: Context, url: String) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.onFailure { Log.w("SettingsScreen", "could not open $url", it) }
 }
 
 /** One city from the search, tappable. */

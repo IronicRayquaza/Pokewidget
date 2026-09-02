@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PokéWidget — animated Pokémon sprites on your Android home screen</title>
+<meta name="description" content="Animated Pokémon sprites as Android home-screen widgets. Any Pokémon, any game's sprite set, tap to hear its cry. Free, open source, sideloaded.">
+<meta property="og:title" content="PokéWidget">
+<meta property="og:description" content="Animated Pokémon sprites as Android home-screen widgets. Free and open source.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  /* The app's palette, verbatim from ui/theme/Color.kt. The page and the app should read as
+     the same object, and the whole look is type, flat colour and 2px keylines — which is why
+     it holds together with no images in it. */
+  :root {
+    --paper:     #FDF6E8;
+    --paper-dot: #DFD2B8;
+    --card:      #FFFFFF;
+    --ink:       #17171A;
+    --ink-soft:  #6E6A63;
+    --red:       #EE1515;
+    --coral:     #FF5A5A;
+    --lime:      #D8F32B;
+    --sky:       #A9E4F5;
+    --chalk:     #F2ECDD;
+    --lift:      4px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    /* The dotted paper, as Modifier.dottedPaper() draws it: 1dp dots on a 16dp grid. */
+    background-color: var(--paper);
+    background-image: radial-gradient(var(--paper-dot) 1.1px, transparent 1.2px);
+    background-size: 16px 16px;
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap { max-width: 640px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  .pixel { font-family: "Press Start 2P", ui-monospace, monospace; font-weight: 400; }
+
+  h1 { font-size: clamp(20px, 6vw, 30px); line-height: 1.35; margin: 0 0 16px; }
+  h1 .accent { color: var(--red); }
+
+  h2 { font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+
+  .tagline { font-size: 17px; margin: 0 0 6px; }
+  .sub { color: var(--ink-soft); font-size: 14px; margin: 0; }
+
+  /* Modifier.sticker(): flat fill, 2px ink outline, a hard offset rather than a blur. */
+  .card {
+    background: var(--card);
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    box-shadow: 0 var(--lift) 0 var(--ink);
+    padding: 20px;
+    margin: 0 0 calc(20px + var(--lift));
+  }
+  .card.chalk { background: var(--chalk); }
+  .card.sky   { background: var(--sky); }
+
+  /* Reserved for a screenshot later. The aspect ratio is fixed, so dropping an image in
+     moves nothing below it. */
+  .shot {
+    aspect-ratio: 9 / 7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: 2px dashed var(--paper-dot);
+    box-shadow: none;
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+
+  a { color: var(--ink); }
+
+  .btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    text-decoration: none;
+    color: var(--ink);
+    background: var(--lime);
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+    box-shadow: 0 var(--lift) 0 var(--ink);
+    padding: 16px 18px;
+    font-size: 15px;
+    font-weight: 600;
+    transition: transform .06s ease, box-shadow .06s ease;
+  }
+  .btn:active { transform: translateY(var(--lift)); box-shadow: 0 0 0 var(--ink); }
+  .btn.coral { background: var(--coral); }
+  .btn .meta { display: block; font-size: 12px; font-weight: 400; color: var(--ink-soft); margin-top: 6px; }
+
+  ol, ul { margin: 0; padding-left: 22px; }
+  li { margin: 0 0 10px; }
+  li:last-child { margin-bottom: 0; }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    background: var(--chalk);
+    border: 1px solid var(--paper-dot);
+    border-radius: 4px;
+    padding: 1px 5px;
+    word-break: break-all;
+  }
+
+  footer {
+    color: var(--ink-soft);
+    font-size: 13px;
+    line-height: 1.65;
+    border-top: 2px solid var(--ink);
+    padding-top: 18px;
+  }
+  footer p { margin: 0 0 10px; }
+  footer p:last-child { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1 class="pixel">Poké<span class="accent">Widget</span></h1>
+    <p class="tagline">Animated Pokémon sprites, living on your home screen.</p>
+    <p class="sub">Any Pokémon, in any game's art. Tap one to hear its cry. Android only, and free.</p>
+  </header>
+
+  <!-- SCREENSHOT SLOT. Replace this whole block with an <img> when the images are ready;
+       the ratio is fixed so the rest of the page will not move. -->
+  <div class="card shot" style="margin-top: 28px;">
+    <span>Screenshot goes here</span>
+  </div>
+
+  <div class="card">
+    <h2 class="pixel">Download</h2>
+    <a class="btn" id="download" href="https://github.com/IronicRayquaza/Pokewidget/releases/latest">
+      <span id="download-label">Download the latest release</span>
+      <span class="meta" id="download-meta">Android 8.0 and up</span>
+    </a>
+    <p class="sub" style="margin-top: 16px">
+      Every release has a <code>.sha256</code> file next to the APK if you want to check what
+      you downloaded. <a href="https://github.com/IronicRayquaza/Pokewidget/releases">All
+      releases and what changed in each</a>.
+    </p>
+  </div>
+
+  <div class="card chalk">
+    <h2 class="pixel">Installing it</h2>
+    <p class="sub" style="margin: 0 0 14px">
+      This is not on the Play Store, so Android will check twice that you meant it. Both
+      warnings are normal and neither means anything is wrong:
+    </p>
+    <ol>
+      <li><b>Open the downloaded file.</b> Android asks whether your browser is allowed to
+        install apps. Say yes — you only do this once.</li>
+      <li><b>Play Protect says it does not recognise the app.</b> It says that about
+        everything that did not come from the Play Store. Tap <b>Install anyway</b>, or
+        <b>More details</b> first if that button is hidden.</li>
+      <li><b>Add a widget.</b> Long-press an empty part of your home screen, tap
+        <b>Widgets</b>, find PokéWidget, and drag one out.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2 class="pixel">What it does</h2>
+    <ul>
+      <li>Every Pokémon, in whichever game's art you like — Emerald, Diamond and Pearl,
+        HeartGold and SoulSilver, Black and White, Scarlet and Violet, and the animated
+        Showdown set.</li>
+      <li>Sprites really animate on the home screen, with no background service and no
+        battery cost.</li>
+      <li>Tap one to hear its cry. Shiny, female and back sprites wherever the games had
+        them.</li>
+      <li>Castform and friends change form with the real weather, in a city you choose.</li>
+      <li>Once a sprite has downloaded once, it keeps working with no connection at all.</li>
+    </ul>
+  </div>
+
+  <div class="card sky" id="discord-card" hidden>
+    <h2 class="pixel">Join the Discord</h2>
+    <p class="sub" style="margin: 0 0 16px">
+      It is a beta, and a sideloaded app cannot update itself — new versions are announced
+      there. It is also where install help, bug reports and home-screen screenshots go.
+    </p>
+    <a class="btn coral" id="discord-link" href="#">Join the Discord</a>
+  </div>
+
+  <footer>
+    <p>
+      Sprites and cries are downloaded from the community PokéAPI mirrors and veekun's
+      archive. None of it is bundled with the app.
+    </p>
+    <p>
+      Pokémon and all related art are trademarks of Nintendo, Creatures Inc. and GAME FREAK
+      inc. This is an unofficial fan project with no affiliation, made for fun and given away
+      free.
+    </p>
+    <p>Open source — <a href="https://github.com/IronicRayquaza/Pokewidget">the code is on GitHub</a>.</p>
+  </footer>
+
+</div>
+
+<script>
+  // Fill the download button in from the latest GitHub release, so this page is written once
+  // and never edited again per version — the step most likely to be forgotten at the end of a
+  // release. The unauthenticated API allows 60 requests an hour per visitor IP, which a
+  // landing page will never approach, and every failure path leaves the hardcoded href alone.
+  const REPO = "IronicRayquaza/Pokewidget";
+
+  // Its own never-expiring invite, separate from the one in the app and the one in the README,
+  // so Discord's per-invite use count says which surface actually brings people in. Empty
+  // means it does not exist yet, and the card stays hidden rather than linking nowhere.
+  const DISCORD_INVITE = "";
+
+  if (DISCORD_INVITE) {
+    document.getElementById("discord-link").href = DISCORD_INVITE;
+    document.getElementById("discord-card").hidden = false;
+  }
+
+  const megabytes = bytes => (bytes / 1048576).toFixed(1) + " MB";
+
+  fetch("https://api.github.com/repos/" + REPO + "/releases/latest", {
+    headers: { Accept: "application/vnd.github+json" },
+  })
+    .then(response => (response.ok ? response.json() : Promise.reject(response.status)))
+    .then(release => {
+      const apk = (release.assets || []).find(asset => asset.name.endsWith(".apk"));
+      if (!apk) return;
+      document.getElementById("download").href = apk.browser_download_url;
+      document.getElementById("download-label").textContent =
+        "Download " + release.tag_name + " for Android";
+      document.getElementById("download-meta").textContent =
+        apk.name + " · " + megabytes(apk.size) + " · Android 8.0 and up";
+    })
+    .catch(() => {
+      // No release yet, offline, or rate-limited. The button still goes to the releases page,
+      // which is the honest fallback rather than a direct link that 404s.
+    });
+</script>
+</body>
+</html>

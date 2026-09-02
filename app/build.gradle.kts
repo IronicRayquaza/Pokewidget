@@ -1,9 +1,27 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+/**
+ * Signing credentials, read from a file that is deliberately absent from the repo. On a public
+ * repo a leaked signing key is unrecoverable: every future update would have to ship as a
+ * fresh install, and every configured widget would be lost.
+ *
+ * Absent is a supported state — a fresh clone must still build and run the tests — so only
+ * `assembleRelease` consumes this, and with no file the release APK comes out unsigned rather
+ * than quietly signed with the machine-local debug key.
+ *
+ * Declared here rather than inside `android { }`, where `java` resolves to Gradle's own Java
+ * extension instead of the package root.
+ */
+val keystoreProperties = rootProject.file("keystore.properties")
+    .takeIf { it.exists() }
+    ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
 
 android {
     namespace = "com.pokewidgets.app"
@@ -13,8 +31,8 @@ android {
         applicationId = "com.pokewidgets.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -27,10 +45,34 @@ android {
         )
     }
 
+    signingConfigs {
+        if (keystoreProperties != null) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Null when there is no `keystore.properties`, which leaves the APK unsigned
+            // rather than silently debug-signed. See `keystore.properties.example`.
+            signingConfig = signingConfigs.findByName("release")
+
+            // R8 is off, on purpose, for the first build that testers install.
+            //
+            // `WidgetConfigStore` persists enum *names* and reads them back through
+            // `runCatching { enumValueOf<T>(it) }.getOrNull() ?: fallback`, so a rename by R8
+            // does not crash — it silently resets every widget already on a home screen,
+            // which is close to the worst thing to have to diagnose from a bug report.
+            // Turning it on is its own task, with keep rules and a device test behind it.
+            // Until then this build differs from the tested debug build in exactly one way:
+            // it is signed with a real key.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

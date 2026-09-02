@@ -4,7 +4,46 @@ Animated Pokémon sprites as Android home-screen widgets. Pick any Pokémon from
 game's sprite set, choose whether it sits on a background, whether tapping plays its cry,
 and how large it renders.
 
-<img src="docs/home-screen.png" width="260" alt="An animated Charizard sprite on the home screen">
+<!-- SCREENSHOT SLOT — images to come. -->
+
+Android 8.0 and up. Free, no ads, no accounts, no tracking of any kind.
+
+## Get it
+
+**[Download the latest release](https://github.com/IronicRayquaza/Pokewidget/releases/latest)**
+&nbsp;·&nbsp; [the page for people, not developers](https://ironicrayquaza.github.io/Pokewidget/)
+&nbsp;·&nbsp; [what changed in each version](CHANGELOG.md)
+
+It is not on the Play Store, so Android checks twice that you meant it. Both warnings are
+normal:
+
+1. Open the downloaded APK. Android asks whether your browser may install apps — say yes, once.
+2. Play Protect says it does not recognise the app. It says that about everything that did not
+   come from the Play Store. Tap **Install anyway** (behind **More details** if it is hidden).
+3. Long-press your home screen, tap **Widgets**, find PokéWidget, drag one out.
+
+A sideloaded app cannot update itself, so new versions are announced in the Discord, along with
+install help and somewhere to report what breaks. <!-- DISCORD INVITE — its own code, separate
+from the app's and the landing page's, so Discord's per-invite counter says where people came
+from. -->
+
+## Not affiliated with anyone
+
+Pokémon and all related art are trademarks of Nintendo, Creatures Inc. and GAME FREAK inc. This
+is an unofficial fan project with no affiliation, made for fun and given away free.
+
+**No Pokémon assets are bundled with the app or stored in this repository.** Sprites and cries
+are fetched at runtime from the community PokéAPI mirrors and veekun's archive, each pinned to
+a fixed revision.
+
+## Building it
+
+`./gradlew :app:assembleDebug` and `./gradlew :app:testDebugUnitTest` work on a fresh clone with
+nothing else set up.
+
+`assembleRelease` additionally needs a `keystore.properties` in the repo root, which is
+deliberately not committed — see [`keystore.properties.example`](keystore.properties.example).
+Without it the release APK comes out unsigned rather than quietly signed with a debug key.
 
 ---
 

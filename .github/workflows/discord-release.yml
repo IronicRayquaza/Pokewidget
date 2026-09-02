@@ -1,0 +1,31 @@
+# Posts a line in #announcements whenever a release is published.
+#
+# The step people skip is the one they do last, tired, after the build and the upload. This is
+# that step. It carries no secrets beyond the webhook URL, and does nothing at all if the
+# webhook has not been set — so the workflow can be merged before the Discord server exists.
+#
+# Setup: Server Settings -> Integrations -> Webhooks, create one pointed at #announcements,
+# then paste the URL into repo Settings -> Secrets and variables -> Actions as
+# DISCORD_RELEASE_WEBHOOK.
+name: Announce release in Discord
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          TAG: ${{ github.event.release.tag_name }}
+          URL: ${{ github.event.release.html_url }}
+        if: env.WEBHOOK != ''
+        run: |
+          # Built with jq rather than string interpolation so a quote or a newline in the tag
+          # cannot produce invalid JSON, or worse.
+          jq -n --arg content "**PokéWidget $TAG** is out. $URL" '{content: $content}' \
+            | curl --silent --show-error --fail -X POST \
+                -H "Content-Type: application/json" --data @- "$WEBHOOK"
