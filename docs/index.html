@@ -68,19 +68,44 @@
   .card.chalk { background: var(--chalk); }
   .card.sky   { background: var(--sky); }
 
-  /* Reserved for a screenshot later. The aspect ratio is fixed, so dropping an image in
-     moves nothing below it. */
-  .shot {
-    aspect-ratio: 9 / 7;
+  /* The demo clip. Capped at the file's native 368px rather than stretched to the column:
+     upscaling a 368px capture to 600px trades the one thing this page is selling — crisp
+     pixel art — for a bigger rectangle. */
+  .demo { margin: 28px 0 calc(20px + var(--lift)); }
+  .demo video {
+    display: block;
+    width: 100%;
+    max-width: 368px;
+    height: auto;
+    margin: 0 auto;
+    background: #000;
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    box-shadow: 0 var(--lift) 0 var(--ink);
+  }
+  .demo figcaption {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
+    gap: 10px;
+    margin: calc(14px + var(--lift)) 0 0;
     text-align: center;
-    border: 2px dashed var(--paper-dot);
-    box-shadow: none;
-    color: var(--ink-soft);
-    font-size: 13px;
   }
+  /* Small, because it sits under the clip rather than competing with the download button. */
+  .sound {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--chalk);
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    padding: 5px 14px;
+    cursor: pointer;
+  }
+  .sound:hover { background: var(--lime); }
+  .sound:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
   a { color: var(--ink); }
 
@@ -137,11 +162,19 @@
     <p class="sub">Any Pokémon, in any game's art. Tap one to hear its cry. Android only, and free.</p>
   </header>
 
-  <!-- SCREENSHOT SLOT. Replace this whole block with an <img> when the images are ready;
-       the ratio is fixed so the rest of the page will not move. -->
-  <div class="card shot" style="margin-top: 28px;">
-    <span>Screenshot goes here</span>
-  </div>
+  <!-- The thing a still frame cannot show. Muted so it is allowed to autoplay at all, with
+       sound behind a button because the cries are half of what the clip demonstrates. -->
+  <figure class="demo">
+    <video id="demo" width="368" height="384" autoplay muted loop playsinline
+           preload="metadata" aria-label="Rayquaza and Deoxys widgets animating on an Android home screen">
+      <source src="pokewidget-demo.mp4" type="video/mp4">
+      Your browser cannot play this clip. It shows two animated Pokémon widgets on a home screen.
+    </video>
+    <figcaption class="sub">
+      <span>Rayquaza and Deoxys, animating on a real home screen.</span>
+      <button type="button" class="sound" id="sound">Sound on</button>
+    </figcaption>
+  </figure>
 
   <div class="card">
     <h2 class="pixel">Download</h2>
@@ -226,6 +259,25 @@
   if (DISCORD_INVITE) {
     document.getElementById("discord-link").href = DISCORD_INVITE;
     document.getElementById("discord-card").hidden = false;
+  }
+
+  const demo = document.getElementById("demo");
+  const sound = document.getElementById("sound");
+
+  // The button is labelled with the action it performs, not the current state.
+  sound.addEventListener("click", () => {
+    demo.muted = !demo.muted;
+    sound.textContent = demo.muted ? "Sound on" : "Sound off";
+    if (!demo.muted) demo.play();
+  });
+
+  // An autoplaying loop is exactly what this preference exists to stop, and CSS cannot pause
+  // a video — so hand over the controls and let the visitor start it.
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    demo.removeAttribute("autoplay");
+    demo.loop = false;
+    demo.controls = true;
+    demo.pause();
   }
 
   const megabytes = bytes => (bytes / 1048576).toFixed(1) + " MB";
