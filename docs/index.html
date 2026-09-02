@@ -219,10 +219,9 @@
   // landing page will never approach, and every failure path leaves the hardcoded href alone.
   const REPO = "IronicRayquaza/Pokewidget";
 
-  // Its own never-expiring invite, separate from the one in the app and the one in the README,
-  // so Discord's per-invite use count says which surface actually brings people in. Empty
-  // means it does not exist yet, and the card stays hidden rather than linking nowhere.
-  const DISCORD_INVITE = "";
+  // The same never-expiring invite the app and the README use. Empty would hide the card
+  // rather than link nowhere.
+  const DISCORD_INVITE = "https://discord.gg/QFuHPZJRqM";
 
   if (DISCORD_INVITE) {
     document.getElementById("discord-link").href = DISCORD_INVITE;

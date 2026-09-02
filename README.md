@@ -22,10 +22,8 @@ normal:
    come from the Play Store. Tap **Install anyway** (behind **More details** if it is hidden).
 3. Long-press your home screen, tap **Widgets**, find PokéWidget, drag one out.
 
-A sideloaded app cannot update itself, so new versions are announced in the Discord, along with
-install help and somewhere to report what breaks. <!-- DISCORD INVITE — its own code, separate
-from the app's and the landing page's, so Discord's per-invite counter says where people came
-from. -->
+A sideloaded app cannot update itself, so new versions are announced in
+**[the Discord](https://discord.gg/QFuHPZJRqM)**, along with install help and somewhere to report what breaks.
 
 ## Not affiliated with anyone
 
