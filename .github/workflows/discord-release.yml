@@ -26,6 +26,22 @@ jobs:
         run: |
           # Built with jq rather than string interpolation so a quote or a newline in the tag
           # cannot produce invalid JSON, or worse.
-          jq -n --arg content "**PokéWidget $TAG** is out. $URL" '{content: $content}' \
-            | curl --silent --show-error --fail -X POST \
-                -H "Content-Type: application/json" --data @- "$WEBHOOK"
+          body=$(jq -n --arg content "**PokéWidget $TAG** is out. $URL" '{content: $content}')
+
+          # `curl --fail` was hiding why this failed, which cost a debugging round trip on the
+          # very first release. Capture the status instead and print it. The webhook URL is a
+          # credential on its own — anyone holding it can post as the webhook — so it is never
+          # echoed, and only Discord's reply is shown.
+          status=$(curl --silent --show-error --output response.txt \
+            --write-out "%{http_code}" -X POST \
+            -H "Content-Type: application/json" --data "$body" "$WEBHOOK")
+
+          echo "Discord replied HTTP $status"
+          if [ "$status" != "204" ] && [ "$status" != "200" ]; then
+            echo "--- response body ---"
+            cat response.txt || true
+            echo "---"
+            echo "401 or 404 means the webhook URL is wrong, truncated, or has been deleted."
+            echo "000 means it could not be reached at all."
+            exit 1
+          fi
