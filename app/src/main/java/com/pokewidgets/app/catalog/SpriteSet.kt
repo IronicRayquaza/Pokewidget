@@ -56,6 +56,12 @@ data class SpriteSet(
      * The games hold the resting pose longer than the moved one, so these are uneven.
      */
     val frameDelaysMs: List<Int> = emptyList(),
+    /**
+     * Source size, in pixels, of a *large* Pokémon in this set — the yardstick for the
+     * widget's "True size" option. Null for 3D renders and artwork, which have no common
+     * scale; "True size" then fills the widget like "Fill" does. See `tools/sets.config.mjs`.
+     */
+    val referencePx: Int? = null,
 ) {
 
     /** How many separate files one sprite of this set is assembled from. */
@@ -82,6 +88,23 @@ data class SpriteSet(
         val path = variantPath(back, shiny, female, style) ?: return false
         return pokemonId in idsFor(path)
     }
+
+    /** Whether this set has any shiny art at all — Red/Blue and Scarlet/Violet do not. */
+    val hasShinies: Boolean get() = variants.keys.any { "shiny" in it.split('/') }
+
+    /**
+     * Why a shiny can or cannot be shown, so the setup screen can say so instead of quietly
+     * hiding the option — which is how people came to believe the app had no shinies.
+     */
+    fun shinyAvailability(pokemonId: Int, back: Boolean, female: Boolean, style: String?): ShinyAvailability =
+        when {
+            covers(pokemonId, back, true, female, style) -> ShinyAvailability.AVAILABLE
+            !hasShinies -> ShinyAvailability.SET_HAS_NONE
+            // Shiny exists, just not in this exact combination: a front shiny when a back
+            // was asked for, say. Turning shiny on will then give up the back.
+            covers(pokemonId, false, true, false, null) -> ShinyAvailability.NOT_WITH_THESE_OPTIONS
+            else -> ShinyAvailability.NOT_FOR_THIS_POKEMON
+        }
 
     /**
      * The variant to actually fetch for [pokemonId], giving up flags one at a time until
@@ -217,4 +240,15 @@ class IdRanges private constructor(private val ranges: List<IntRange>) {
             return IdRanges(ranges.sortedBy { it.first })
         }
     }
+}
+
+/** See [SpriteSet.shinyAvailability]. */
+enum class ShinyAvailability {
+    AVAILABLE,
+    /** The game never drew shinies, or this dump does not carry them. */
+    SET_HAS_NONE,
+    /** The set has shinies, but not of this Pokémon or form. */
+    NOT_FOR_THIS_POKEMON,
+    /** There is a shiny, but not together with back/female/style as currently chosen. */
+    NOT_WITH_THESE_OPTIONS,
 }

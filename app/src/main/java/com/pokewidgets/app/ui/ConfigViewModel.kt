@@ -1,24 +1,34 @@
 package com.pokewidgets.app.ui
 
 import android.app.Application
+import android.graphics.Bitmap
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pokewidgets.app.catalog.BackgroundIndex
 import com.pokewidgets.app.catalog.CatalogRepository
 import com.pokewidgets.app.catalog.PokemonEntry
 import com.pokewidgets.app.catalog.SpriteKey
+import com.pokewidgets.app.catalog.ShinyAvailability
 import com.pokewidgets.app.catalog.SpriteSet
+import com.pokewidgets.app.catalog.Trainer
+import com.pokewidgets.app.catalog.TrainerIndex
+import com.pokewidgets.app.data.Scene
 import com.pokewidgets.app.data.SpriteSource
+import com.pokewidgets.app.data.TrainerPose
 import com.pokewidgets.app.data.WeatherSource
 import com.pokewidgets.app.data.WidgetConfig
 import com.pokewidgets.app.data.WidgetConfigStore
+import com.pokewidgets.app.sprite.TrainerArt
 import com.pokewidgets.app.widget.WeatherRefreshScheduler
 import com.pokewidgets.app.widget.WidgetRenderer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class ConfigUiState(
     val loading: Boolean = true,
@@ -40,7 +50,35 @@ data class ConfigUiState(
     val warning: String? = null,
     /** The city weather is taken from, or null when none has been chosen in Settings. */
     val weatherPlace: String? = null,
+
+    /** Whether a shiny can be shown right now, and if not, why. */
+    val shiny: ShinyAvailability = ShinyAvailability.AVAILABLE,
+    /** A one-off explanation of something the screen just did or could not do. */
+    val notice: String? = null,
+
+    val trainers: TrainerIndex? = null,
+    val backgrounds: BackgroundIndex? = null,
+    /** The paired trainer, resolved from [WidgetConfig.trainerId]. */
+    val trainer: Trainer? = null,
+    /** That trainer as the widget will draw it — back sprite sliced and coloured — for the preview. */
+    val trainerArt: Bitmap? = null,
+    /** True while [trainerArt] is the front standing in for a back no game drew. */
+    val trainerIsStandIn: Boolean = false,
 )
+
+/** What sits behind the sprite. Stored as two fields; chosen as one. */
+enum class BackgroundMode(val label: String) {
+    OFF("None"),
+    COLOR("Colour"),
+    BATTLE("Battle scene"),
+}
+
+val WidgetConfig.backgroundMode: BackgroundMode
+    get() = when {
+        backgroundId != null -> BackgroundMode.BATTLE
+        showBackground -> BackgroundMode.COLOR
+        else -> BackgroundMode.OFF
+    }
 
 class ConfigViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -81,8 +119,94 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun update(transform: (WidgetConfig) -> WidgetConfig) {
-        _state.update { it.copy(config = transform(it.config)) }
+        _state.update { it.copy(config = transform(it.config), notice = null) }
         viewModelScope.launch { refreshDerived() }
+    }
+
+    /**
+     * Turns shiny on or off — or, when it cannot be on, says why instead of doing nothing.
+     *
+     * A shiny that exists only without the current back/female/style choice is switched on
+     * anyway and the conflicting choice dropped, with a note: someone tapping "Shiny" wants
+     * the shiny more than they want the back view they picked earlier.
+     */
+    fun toggleShiny() {
+        val current = _state.value
+        val c = current.config
+        val set = current.selectedSet ?: return
+        if (c.shiny) {
+            update { it.copy(shiny = false) }
+            return
+        }
+        when (current.shiny) {
+            ShinyAvailability.AVAILABLE -> update { it.copy(shiny = true) }
+            ShinyAvailability.NOT_WITH_THESE_OPTIONS -> {
+                update { it.copy(shiny = true, back = false, female = false, style = null) }
+                _state.update { it.copy(notice = "${set.label} only has a front shiny of this Pokémon, so the widget shows that.") }
+            }
+            ShinyAvailability.SET_HAS_NONE -> _state.update {
+                it.copy(notice = "${set.label} has no shiny sprites. Showdown, Black / White and most other sets do.")
+            }
+            ShinyAvailability.NOT_FOR_THIS_POKEMON -> _state.update {
+                it.copy(notice = "${set.label} never drew a shiny of this Pokémon. Try another sprite set.")
+            }
+        }
+    }
+
+    fun selectTrainer(trainerId: String?) {
+        update { c ->
+            when {
+                trainerId == null -> c.copy(trainerId = null, scene = Scene.SOLO)
+                // Picking someone should visibly do something: solo would hide them.
+                c.scene == Scene.SOLO -> c.copy(trainerId = trainerId, scene = Scene.SIDE_BY_SIDE)
+                else -> c.copy(trainerId = trainerId)
+            }
+        }
+    }
+
+    fun setBackgroundMode(mode: BackgroundMode) {
+        val gen = _state.value.selectedSet?.gen ?: 5
+        val library = _state.value.backgrounds
+        update { c ->
+            when (mode) {
+                BackgroundMode.OFF -> c.copy(showBackground = false, backgroundId = null)
+                BackgroundMode.COLOR -> c.copy(showBackground = true, backgroundId = null)
+                BackgroundMode.BATTLE -> c.copy(
+                    showBackground = true,
+                    backgroundId = c.backgroundId ?: library?.defaultFor(gen)?.id,
+                )
+            }
+        }
+    }
+
+    /**
+     * One tap from a plain widget to the start of a battle: the trainer from behind, the
+     * Pokémon from behind, and the matching generation's battlefield behind them both.
+     *
+     * Only ever run because the user pressed the button; nothing else in the app turns
+     * any of these on.
+     */
+    fun applyBattleScene() {
+        val current = _state.value
+        val set = current.selectedSet ?: return
+        val c = current.config
+        val trainer = current.trainers?.trainer(c.trainerId) ?: current.trainers?.defaultFor(set.gen)
+        val canBack = set.covers(c.pokemonId, true, c.shiny, c.female, c.style)
+        update {
+            it.copy(
+                scene = Scene.BATTLE,
+                trainerId = trainer?.id ?: it.trainerId,
+                trainerPose = TrainerPose.BACK,
+                back = canBack || it.back,
+                showBackground = true,
+                backgroundId = it.backgroundId ?: current.backgrounds?.defaultFor(set.gen)?.id,
+            )
+        }
+        if (!canBack) {
+            _state.update {
+                it.copy(notice = "${set.label} has no back sprite of this Pokémon, so it faces you instead.")
+            }
+        }
     }
 
     fun selectPokemon(pokemonId: Int) {
@@ -124,11 +248,19 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
                 // Variant support differs wildly between sets — Emerald has no back
                 // sprites, Scarlet/Violet has no shiny. Drop anything the new set lacks
                 // instead of silently rendering the wrong file.
+                val keepsShiny = set.covers(c.pokemonId, c.back, true, c.female, c.style)
                 current.copy(
+                    // Dropping a shiny silently is exactly what made people think the app
+                    // had none. Say so.
+                    notice = if (c.shiny && !keepsShiny) {
+                        "${set.label} has no shiny of this Pokémon, so the widget shows the normal colours."
+                    } else {
+                        null
+                    },
                     config = c.copy(
                         setId = setId,
                         back = c.back && set.covers(c.pokemonId, true, c.shiny, c.female, c.style),
-                        shiny = c.shiny && set.covers(c.pokemonId, c.back, true, c.female, c.style),
+                        shiny = c.shiny && keepsShiny,
                         female = c.female && set.covers(c.pokemonId, c.back, c.shiny, true, c.style),
                         style = c.style?.takeIf { set.variants.keys.any { k -> k.contains(it) } },
                     ),
@@ -166,10 +298,25 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
 
         val place = weather.place()?.label
 
+        val trainers = runCatching { catalog.trainers() }
+            .onFailure { Log.e(TAG, "could not read the trainer catalogue", it) }.getOrNull()
+        val backgrounds = runCatching { catalog.backgrounds() }
+            .onFailure { Log.e(TAG, "could not read the background catalogue", it) }.getOrNull()
+        val trainer = trainers?.trainer(config.trainerId)
+        val wantsBack = config.trainerPose == TrainerPose.BACK
+        val art = trainer?.let { loadTrainerArt(trainers, it, wantsBack) }
+
         _state.update {
             it.copy(
                 entry = entry,
                 weatherPlace = place,
+                shiny = set?.shinyAvailability(config.pokemonId, config.back, config.female, config.style)
+                    ?: ShinyAvailability.SET_HAS_NONE,
+                trainers = trainers,
+                backgrounds = backgrounds,
+                trainer = trainer,
+                trainerArt = art,
+                trainerIsStandIn = trainer != null && wantsBack && !trainer.hasBack,
                 availableSets = sets,
                 availableSetPreviews = previews,
                 selectedSet = set,
@@ -185,6 +332,27 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
                 },
             )
         }
+    }
+
+    /** Last trainer art decoded, so moving a slider does not re-decode the same image. */
+    private var trainerArtKey: String? = null
+    private var trainerArtCache: Bitmap? = null
+
+    private suspend fun loadTrainerArt(index: TrainerIndex, trainer: Trainer, back: Boolean): Bitmap? {
+        val key = "${trainer.id}/$back"
+        if (key == trainerArtKey) return trainerArtCache
+        val art = withContext(Dispatchers.IO) {
+            runCatching {
+                source.trainerBytes(index, trainer, back)
+                    ?.let { TrainerArt.decode(it, trainer.back?.takeIf { back }) }
+            }.getOrNull()
+        }
+        // Only remember a success, so a trainer that failed offline is retried next time.
+        if (art != null) {
+            trainerArtKey = key
+            trainerArtCache = art
+        }
+        return art
     }
 
     private fun variantLabel(config: WidgetConfig): String = buildList {

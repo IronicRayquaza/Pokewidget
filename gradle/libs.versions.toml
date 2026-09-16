@@ -9,7 +9,6 @@ lifecycle = "2.8.7"
 datastore = "1.1.1"
 work = "2.10.0"
 okhttp = "4.12.0"
-gifDecoder = "4.16.0"
 coil = "3.0.4"
 serialization = "1.7.3"
 coroutines = "1.9.0"
@@ -37,7 +36,6 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
-glide-gifdecoder = { module = "com.github.bumptech.glide:gifdecoder", version.ref = "gifDecoder" }
 
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version.ref = "coil" }

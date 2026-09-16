@@ -56,7 +56,7 @@ class FramePlannerTest {
                             "$where produced ${plan.stepCount} frames",
                             plan.stepCount in 1..FramePlanner.MAX_FRAMES,
                         )
-                        assertTrue("$where scale ${plan.scale}", plan.scale >= 1)
+                        assertTrue("$where display ${plan.displayWidth}", plan.displayWidth >= 1 && plan.outWidth >= 1)
                     }
                 }
             }
@@ -119,7 +119,7 @@ class FramePlannerTest {
             FramePlanner.Request(uniform(1, 100, 64, 64), 256, 256, budgetBytes = phone1080),
         )
         assertEquals(1, plan.stepCount)
-        assertEquals(4, plan.scale)
+        assertEquals("fills the widget, less the margin", 236, plan.displayWidth)
     }
 
     // ---- Trade-off ordering --------------------------------------------------------
@@ -134,8 +134,8 @@ class FramePlannerTest {
             FramePlanner.Request(pikachu, 525, 525, desiredFps = 12, budgetBytes = phone1080),
         )
         assertEquals("frame rate should have been defended", 12, plan.fps)
-        assertTrue("expected a still-generous scale, got ${plan.scale}", plan.scale >= 4)
-        assertTrue("expected 8x to have been given up", plan.scale < 8)
+        assertTrue("expected a still-generous stored multiple, got ${plan.outWidth / 60}", plan.outWidth / 60 >= 4)
+        assertTrue("expected 8x storage to have been given up", plan.outWidth / 60 < 8)
     }
 
     @Test
@@ -146,7 +146,7 @@ class FramePlannerTest {
             FramePlanner.Request(rayquazaShowdown, 350, 350, desiredFps = 12, budgetBytes = phone720),
         )
         assertTrue("expected fps to be reduced from 12, got ${plan.fps}", plan.fps < 12)
-        assertTrue("scale should have bottomed out, got ${plan.scale}", plan.scale <= 2)
+        assertTrue("stored multiple should have bottomed out, got ${plan.outWidth / 142}", plan.outWidth / 142 <= 2)
     }
 
     @Test
@@ -186,8 +186,8 @@ class FramePlannerTest {
             deduped.distinctFrames.size < plain.distinctFrames.size,
         )
         assertTrue(
-            "the saving should be spent on a larger sprite: ${deduped.scale} vs ${plain.scale}",
-            deduped.scale > plain.scale,
+            "the saving should be spent on sharper storage: ${deduped.outWidth} vs ${plain.outWidth}",
+            deduped.outWidth > plain.outWidth,
         )
         // The saving shows up as both a bigger sprite and a smoother one: the naive plan
         // has to drop frame rate to fit, the deduped one keeps what was asked for.
@@ -232,8 +232,8 @@ class FramePlannerTest {
         // a sprite that could not be planned at 8 fps fell all the way to 74x75 px in the
         // middle of a 350 px widget — while spending under a fifth of the budget it had.
         assertTrue(
-            "expected an upscale, got ${plan.scale}x using ${plan.estimatedBytes} of $phone1080",
-            plan.scale >= 2,
+            "expected an upscale, got ${plan.outWidth / 74}x using ${plan.estimatedBytes} of $phone1080",
+            plan.outWidth / 74 >= 2,
         )
         assertTrue(plan.estimatedBytes <= phone1080)
         assertTrue(plan.stepCount in 1..FramePlanner.MAX_FRAMES)
@@ -257,9 +257,9 @@ class FramePlannerTest {
             FramePlanner.Request(charizardBlackWhite, 350, 350, budgetBytes = phone1080),
         )
         assertTrue(
-            "expected an upscale, got ${plan.scale}x at ${plan.fps} fps using " +
+            "expected an upscale, got ${plan.outWidth / 87}x at ${plan.fps} fps using " +
                 "${plan.estimatedBytes} of $phone1080",
-            plan.scale >= 2,
+            plan.outWidth / 87 >= 2,
         )
         assertTrue(plan.estimatedBytes <= phone1080)
         assertTrue(plan.stepCount in 1..FramePlanner.MAX_FRAMES)
@@ -273,7 +273,7 @@ class FramePlannerTest {
         // Anything below 8 fps is only ever reached once nothing at or above it fits, so a
         // plan that gave up frame rate must have spent the saving on scale.
         if (plan.fps < 8) {
-            assertTrue("gave up frame rate for nothing", plan.scale > 1)
+            assertTrue("gave up frame rate for nothing", plan.outWidth / 74 > 1)
         }
     }
 
@@ -293,5 +293,97 @@ class FramePlannerTest {
         // The framework ceiling is screenW * screenH * 4 * 1.5; we take a fraction of it.
         assertEquals(5_529_600L, 720L * 1280 * 4 * 3 / 2)
         assertEquals((5_529_600L * 0.40).toLong(), FramePlanner.budgetFor(720, 1280))
+    }
+
+    // ---- Size on screen (1.5) -----------------------------------------------------
+
+    /** showdown/389.gif — 98x106, 59 frames over 2360 ms. Measured. */
+    private val torterraShowdown = uniform(59, 40, 98, 106)
+
+    /** showdown/54.gif — 51x53, 49 frames over 1470 ms. Measured. */
+    private val psyduckShowdown = uniform(49, 30, 51, 53)
+
+    @Test
+    fun `fill really fills the widget, however little budget there is`() {
+        val sources = listOf(rayquazaShowdown, rayquazaBlackWhite, zapdosBlackWhite, torterraShowdown)
+        for (src in sources) {
+            for (box in listOf(350, 470, 900)) {
+                for (budget in listOf(phone720, phone1080, 600_000L)) {
+                    val plan = FramePlanner.plan(FramePlanner.Request(src, box, box, budgetBytes = budget))
+                    val longest = maxOf(plan.displayWidth, plan.displayHeight)
+                    assertTrue(
+                        "${src.contentWidth}x${src.contentHeight} in $box px on $budget B was drawn $longest px",
+                        longest >= box * 0.9,
+                    )
+                    assertTrue(plan.estimatedBytes <= budget || plan.truncated)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a big Pokemon with a long loop is no longer drawn smaller than a small one`() {
+        // The bug report: on a ~470 px widget Torterra came out at 2x (212 px) and Psyduck
+        // at 6x (318 px). Both now fill the widget.
+        val torterra = FramePlanner.plan(FramePlanner.Request(torterraShowdown, 470, 470, budgetBytes = phone1080))
+        val psyduck = FramePlanner.plan(FramePlanner.Request(psyduckShowdown, 470, 470, budgetBytes = phone1080))
+        assertTrue("Torterra ${torterra.displayHeight}", torterra.displayHeight >= 420)
+        assertTrue("Psyduck ${psyduck.displayHeight}", psyduck.displayHeight >= 420)
+    }
+
+    @Test
+    fun `true size keeps the species in proportion`() {
+        fun trueSize(src: FramePlanner.Source) = FramePlanner.plan(
+            FramePlanner.Request(
+                src, 470, 470,
+                displayScale = FramePlanner.displayScale(
+                    src.contentWidth, src.contentHeight, 470, 470, referencePx = 140,
+                ),
+                budgetBytes = phone1080,
+            ),
+        )
+        val torterra = trueSize(torterraShowdown)
+        val psyduck = trueSize(psyduckShowdown)
+        val ratio = torterra.displayHeight.toDouble() / psyduck.displayHeight
+        assertEquals("106 px vs 53 px of sprite", 2.0, ratio, 0.05)
+        assertTrue(torterra.displayHeight <= 470)
+    }
+
+    @Test
+    fun `a multiple is exact when the widget has room, and clamped when it does not`() {
+        assertEquals(4.0, FramePlanner.displayScale(51, 53, 470, 470, multiple = 4), 0.0)
+        val clamped = FramePlanner.displayScale(142, 153, 350, 350, multiple = 4)
+        assertTrue("4x Rayquaza must still fit 350 px: $clamped", 153 * clamped <= 350)
+
+        val plan = FramePlanner.plan(
+            FramePlanner.Request(psyduckShowdown, 470, 470, displayScale = 4.0, budgetBytes = phone1080),
+        )
+        assertEquals(51 * 4, plan.displayWidth)
+        assertEquals(53 * 4, plan.displayHeight)
+    }
+
+    @Test
+    fun `sharp bitmaps are used whenever the budget allows them`() {
+        val still = FramePlanner.plan(FramePlanner.Request(uniform(1, 100, 64, 64), 256, 256, budgetBytes = phone1080))
+        assertEquals(FramePlanner.Tier.SHARP, still.tier)
+
+        val big = FramePlanner.plan(FramePlanner.Request(rayquazaShowdown, 700, 700, budgetBytes = phone720))
+        assertEquals(FramePlanner.Tier.SCALED, big.tier)
+        assertTrue("stored smaller than shown", big.outWidth < big.displayWidth)
+    }
+
+    @Test
+    fun `the worst sprite on the smallest screen is stretched, not truncated`() {
+        val plan = FramePlanner.plan(FramePlanner.Request(rayquazaShowdown, 700, 350, budgetBytes = phone720))
+        assertTrue("should not have had to truncate", !plan.truncated)
+        assertTrue(plan.estimatedBytes <= phone720)
+    }
+
+    @Test
+    fun `art larger than the widget is shrunk to fit, never clipped`() {
+        // Official artwork: 431x402 of art in a 200 px widget.
+        val plan = FramePlanner.plan(FramePlanner.Request(uniform(1, 100, 431, 402), 200, 200, budgetBytes = phone1080))
+        assertTrue(plan.displayWidth <= 200 && plan.displayHeight <= 200)
+        assertEquals(FramePlanner.Tier.SHARP, plan.tier)
     }
 }

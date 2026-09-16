@@ -1,11 +1,13 @@
 package com.pokewidgets.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,6 +16,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -36,29 +41,52 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import com.pokewidgets.app.catalog.BattleBackground
+import com.pokewidgets.app.catalog.ShinyAvailability
 import com.pokewidgets.app.data.Fill
+import com.pokewidgets.app.data.Scene
 import com.pokewidgets.app.data.Smoothness
 import com.pokewidgets.app.data.TapAction
+import com.pokewidgets.app.data.TrainerPose
+import com.pokewidgets.app.data.TrainerSide
 import com.pokewidgets.app.data.WidgetConfig
 import com.pokewidgets.app.catalog.FormRules
 import com.pokewidgets.app.catalog.SpriteSet
 import com.pokewidgets.app.sprite.IdleAnimator
 import com.pokewidgets.app.sprite.IdleStyle
+import com.pokewidgets.app.ui.BackgroundMode
 import com.pokewidgets.app.ui.ConfigUiState
+import com.pokewidgets.app.ui.backgroundMode
 import com.pokewidgets.app.ui.components.Caption
+import com.pokewidgets.app.ui.components.MirrorChip
 import com.pokewidgets.app.ui.components.PokeButton
 import com.pokewidgets.app.ui.components.PokeChip
 import com.pokewidgets.app.ui.components.PokeHeader
 import com.pokewidgets.app.ui.components.PokemonIcon
 import com.pokewidgets.app.ui.components.SectionHeader
+import com.pokewidgets.app.ui.components.ShinyChip
 import com.pokewidgets.app.ui.components.SpriteImage
 import com.pokewidgets.app.ui.components.SpriteStage
 import com.pokewidgets.app.ui.components.TypeChip
 import com.pokewidgets.app.ui.components.pressScale
 import com.pokewidgets.app.ui.theme.Chalk
 import com.pokewidgets.app.ui.theme.Ink
+import com.pokewidgets.app.widget.SceneLayout
+import com.pokewidgets.app.widget.sceneryBox
+import kotlin.math.roundToInt
 import com.pokewidgets.app.ui.theme.Lime
 import com.pokewidgets.app.ui.theme.PokeRed
 import com.pokewidgets.app.ui.theme.Paper
@@ -67,11 +95,21 @@ import com.pokewidgets.app.ui.theme.sticker
 import com.pokewidgets.app.ui.theme.topRule
 import com.pokewidgets.app.ui.theme.Card as CardColor
 
+/** The setup actions that are more than "change one field", grouped to keep the signature short. */
+data class ConfigActions(
+    val toggleShiny: () -> Unit,
+    val selectTrainer: (String?) -> Unit,
+    val setBackgroundMode: (BackgroundMode) -> Unit,
+    val applyBattleScene: () -> Unit,
+)
+
 @Composable
 fun ConfigScreen(
     state: ConfigUiState,
     onPickPokemon: () -> Unit,
     onPickSet: () -> Unit,
+    onPickTrainer: () -> Unit,
+    actions: ConfigActions,
     onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit,
     onSave: () -> Unit,
 ) {
@@ -91,6 +129,7 @@ fun ConfigScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             PreviewPanel(state)
+            PreviewToggles(state, actions, onUpdate)
 
             Panel {
                 SectionHeader("Pokémon")
@@ -106,7 +145,8 @@ fun ConfigScreen(
 
             VariantSection(state, onUpdate)
             LiveFormSection(state, onUpdate)
-            AppearanceSection(state, onUpdate)
+            AppearanceSection(state, actions, onUpdate)
+            TrainerSection(state, actions, onPickTrainer, onUpdate)
             AnimationSection(state, onUpdate)
             InteractionSection(state, onUpdate)
 
@@ -146,34 +186,108 @@ private fun Panel(content: @Composable () -> Unit) {
     }
 }
 
-/** The sprite standing on its plate, previewing the real background settings. */
+/**
+ * The widget as it will look: background, trainer and Pokémon, laid out by the same
+ * [SceneLayout] the widget renderer uses, so the two cannot disagree about where anyone
+ * stands.
+ */
 @Composable
 private fun PreviewPanel(state: ConfigUiState) {
     val config = state.config
+    val background = state.backgrounds?.background(config.backgroundId)
+    val trainerArt = state.trainerArt
+    val scene = if (trainerArt == null) Scene.SOLO else config.effectiveScene
+    val trainerMirrored = state.trainerIsStandIn != config.trainerFlip
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(config.cornerRadiusDp.dp)
+
     SpriteStage(
         modifier = Modifier
             .fillMaxWidth()
             .height(230.dp),
         ballFraction = 0.76f,
     ) {
-        Box(
+        BoxWithConstraints(
             Modifier
                 .fillMaxSize()
                 .then(
-                    if (config.showBackground) {
-                        Modifier
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(config.cornerRadiusDp.dp))
-                            .background(Color(config.backgroundColor))
-                    } else {
-                        Modifier
+                    when {
+                        background != null -> Modifier.clip(shape)
+                        config.showBackground -> Modifier.clip(shape).background(Color(config.backgroundColor))
+                        else -> Modifier
                     },
                 ),
-            contentAlignment = Alignment.Center,
         ) {
+            if (background != null) {
+                BattleBackgroundImage(background, Modifier.fillMaxSize())
+            }
+
+            val w = maxWidth.value.roundToInt()
+            val h = maxHeight.value.roundToInt()
+            val layout = SceneLayout.layout(scene, config.trainerSide, w, h)
+            val align = if (layout.anchorBottom) Alignment.BottomCenter else Alignment.Center
+
+            @Composable
+            fun Trainer() {
+                val box = layout.trainer ?: return
+                if (trainerArt == null) return
+                val image = remember(trainerArt) { trainerArt.asImageBitmap() }
+                Image(
+                    bitmap = image,
+                    contentDescription = state.trainer?.displayName,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.BottomCenter,
+                    filterQuality = FilterQuality.None,
+                    modifier = Modifier
+                        .offset(box.left.dp, box.top.dp)
+                        .size(box.width.dp, box.height.dp)
+                        .graphicsLayer { scaleX = if (trainerMirrored) -1f else 1f },
+                )
+            }
+
+            if (!layout.trainerInFront) Trainer()
+            val p = layout.pokemon
             SpriteImage(
                 url = state.previewUrl,
                 contentDescription = state.entry?.displayName,
-                modifier = Modifier.fillMaxSize().padding(12.dp),
+                alignment = align,
+                modifier = Modifier
+                    .offset(p.left.dp, p.top.dp)
+                    .size(p.width.dp, p.height.dp)
+                    .padding(12.dp)
+                    .graphicsLayer { scaleX = if (config.flipHorizontal) -1f else 1f },
+            )
+            if (layout.trainerInFront) Trainer()
+        }
+    }
+}
+
+/**
+ * The two things people most often want to change, right under the picture of the widget:
+ * shiny, and which way the Pokémon faces.
+ */
+@Composable
+private fun PreviewToggles(
+    state: ConfigUiState,
+    actions: ConfigActions,
+    onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit,
+) {
+    val c = state.config
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            ShinyChip(
+                on = c.shiny,
+                onToggle = actions.toggleShiny,
+                available = state.shiny == ShinyAvailability.AVAILABLE ||
+                    state.shiny == ShinyAvailability.NOT_WITH_THESE_OPTIONS,
+            )
+            MirrorChip(on = c.flipHorizontal, onToggle = { onUpdate { it.copy(flipHorizontal = !it.flipHorizontal) } })
+        }
+        AnimatedVisibility(visible = state.notice != null) {
+            Caption(
+                state.notice.orEmpty(),
+                Modifier
+                    .padding(top = 8.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
     }
@@ -320,17 +434,14 @@ private fun VariantSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> Wi
     // Per *this* Pokémon, not per set. Upstream's `female/` directories hold about forty
     // sprites while the set advertises the directory for all 1345, so asking the set-level
     // question here is what used to offer a Female chip that produced a permanent 404.
-    val canShiny = set.covers(c.pokemonId, c.back, true, c.female, c.style)
+    // Shiny lives by the preview now, where it is always visible.
     val canBack = set.covers(c.pokemonId, true, c.shiny, c.female, c.style)
     val canFemale = set.covers(c.pokemonId, c.back, c.shiny, true, c.style)
-    if (!canShiny && !canBack && !canFemale) return
+    if (!canBack && !canFemale) return
 
     Panel {
         SectionHeader("Variant")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (canShiny) {
-                PokeChip("Shiny", c.shiny, { onUpdate { it.copy(shiny = !it.shiny) } })
-            }
             if (canBack) {
                 PokeChip("Back", c.back, { onUpdate { it.copy(back = !it.back) } })
             }
@@ -386,17 +497,31 @@ private fun LiveFormSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> W
 }
 
 @Composable
-private fun AppearanceSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit) {
+private fun AppearanceSection(
+    state: ConfigUiState,
+    actions: ConfigActions,
+    onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit,
+) {
     val c = state.config
+    val mode = c.backgroundMode
     Panel {
         SectionHeader("Background")
-        SettingRow(
-            title = "Show a background",
-            subtitle = "Off means the sprite floats on your wallpaper",
-        ) {
-            PokeSwitch(c.showBackground) { on -> onUpdate { it.copy(showBackground = on) } }
-        }
-        AnimatedVisibility(visible = c.showBackground) {
+        OptionRow(
+            options = BackgroundMode.entries,
+            selected = mode,
+            label = { it.label },
+            onSelect = actions.setBackgroundMode,
+        )
+        Spacer(Modifier.height(6.dp))
+        Caption(
+            when (mode) {
+                BackgroundMode.OFF -> "The sprite floats on your wallpaper."
+                BackgroundMode.COLOR -> "A plain plate behind the sprite."
+                BackgroundMode.BATTLE -> "A battlefield from the games, behind the sprite."
+            },
+        )
+
+        AnimatedVisibility(visible = mode == BackgroundMode.COLOR) {
             Column {
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -428,6 +553,29 @@ private fun AppearanceSection(state: ConfigUiState, onUpdate: ((WidgetConfig) ->
                         }
                     }
                 }
+            }
+        }
+
+        AnimatedVisibility(visible = mode == BackgroundMode.BATTLE) {
+            Column {
+                Spacer(Modifier.height(12.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                ) {
+                    items(state.backgrounds?.backgrounds.orEmpty(), key = { it.id }) { bg ->
+                        BackgroundThumb(
+                            background = bg,
+                            selected = bg.id == c.backgroundId,
+                            onClick = { onUpdate { it.copy(showBackground = true, backgroundId = bg.id) } },
+                        )
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(visible = mode != BackgroundMode.OFF) {
+            Column {
                 Spacer(Modifier.height(16.dp))
                 Caption("Corner radius · " + c.cornerRadiusDp + "dp")
                 Slider(
@@ -442,6 +590,168 @@ private fun AppearanceSection(state: ConfigUiState, onUpdate: ((WidgetConfig) ->
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun BackgroundThumb(background: BattleBackground, selected: Boolean, onClick: () -> Unit) {
+    val interactions = remember { MutableInteractionSource() }
+    Column(
+        Modifier
+            .width(112.dp)
+            .pressScale(interactions)
+            .sticker(
+                shape = MaterialTheme.shapes.small,
+                fill = if (selected) Lime else CardColor,
+                borderWidth = if (selected) 3.dp else 2.dp,
+                lift = if (selected) 4.dp else 2.dp,
+            )
+            .clickable(interactionSource = interactions, indication = null, onClick = onClick)
+            .semantics { this.selected = selected }
+            .padding(6.dp),
+    ) {
+        BattleBackgroundImage(
+            background,
+            Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(MaterialTheme.shapes.extraSmall),
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            background.displayName,
+            style = MaterialTheme.typography.labelSmall,
+            color = Ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * The optional trainer. Everything here starts switched off; a widget only ever gets a
+ * trainer because someone chose one on this panel.
+ */
+@Composable
+private fun TrainerSection(
+    state: ConfigUiState,
+    actions: ConfigActions,
+    onPickTrainer: () -> Unit,
+    onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit,
+) {
+    val c = state.config
+    val trainer = state.trainer
+    Panel {
+        SectionHeader("Trainer")
+        if (trainer == null) {
+            Caption("Pair your Pokémon with a trainer — gym leaders, champions and rivals from every region.")
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PokeButton(
+                    text = "Choose a trainer",
+                    onClick = onPickTrainer,
+                    container = CardColor,
+                    modifier = Modifier.weight(1f),
+                )
+                PokeButton(
+                    text = "Battle scene",
+                    onClick = actions.applyBattleScene,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            return@Panel
+        }
+
+        TrainerRow(state, onPickTrainer)
+        Spacer(Modifier.height(14.dp))
+
+        Caption("Layout")
+        OptionRow(
+            options = listOf(Scene.SIDE_BY_SIDE, Scene.BATTLE),
+            selected = c.effectiveScene,
+            label = { it.label },
+            onSelect = { s -> onUpdate { it.copy(scene = s) } },
+        )
+        Caption(c.effectiveScene.description)
+
+        Spacer(Modifier.height(12.dp))
+        Caption("Trainer faces")
+        OptionRow(
+            options = TrainerPose.entries,
+            selected = c.trainerPose,
+            label = { it.label },
+            onSelect = { p -> onUpdate { it.copy(trainerPose = p) } },
+        )
+        if (state.trainerIsStandIn) {
+            // Honest about it: no game ever drew this trainer from behind.
+            Caption("No game drew ${trainer.name} from behind, so the front is shown turned around.")
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Caption("Stands on the")
+        OptionRow(
+            options = TrainerSide.entries,
+            selected = c.trainerSide,
+            label = { it.label },
+            onSelect = { s -> onUpdate { it.copy(trainerSide = s) } },
+        )
+
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MirrorChip(
+                on = c.trainerFlip,
+                onToggle = { onUpdate { it.copy(trainerFlip = !it.trainerFlip) } },
+                label = "Mirror trainer",
+            )
+            PokeChip("Remove trainer", false, { actions.selectTrainer(null) })
+        }
+        if (c.effectiveScene != Scene.BATTLE) {
+            Spacer(Modifier.height(12.dp))
+            PokeButton(
+                text = "Make it a battle scene",
+                onClick = actions.applyBattleScene,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrainerRow(state: ConfigUiState, onPick: () -> Unit) {
+    val interactions = remember { MutableInteractionSource() }
+    val trainer = state.trainer ?: return
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .pressScale(interactions)
+            .sticker(shape = MaterialTheme.shapes.small, fill = Chalk, lift = 3.dp)
+            .clickable(interactionSource = interactions, indication = null, onClick = onPick)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SpriteStage(
+            modifier = Modifier.size(56.dp),
+            shape = MaterialTheme.shapes.extraSmall,
+            borderWidth = 2.dp,
+            lift = 0.dp,
+            ballFraction = 0.7f,
+            inset = 4.dp,
+        ) {
+            SpriteImage(state.trainers?.frontUrl(trainer), trainer.displayName, Modifier.fillMaxSize())
+        }
+        Column(Modifier.weight(1f)) {
+            Text(trainer.name, style = MaterialTheme.typography.titleMedium, color = Ink)
+            Spacer(Modifier.height(6.dp))
+            Caption(
+                listOfNotNull(
+                    state.trainers?.roleLabel(trainer.role),
+                    state.trainers?.regionLabel(trainer.region),
+                    trainer.variant,
+                ).joinToString(" · "),
+            )
+        }
+        Text("CHANGE", style = MaterialTheme.typography.labelSmall, color = PokeRed)
     }
 }
 
@@ -491,6 +801,7 @@ private fun AnimationSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> 
             label = { it.label },
             onSelect = { f -> onUpdate { it.copy(fill = f) } },
         )
+        Caption(c.fill.description)
     }
 }
 
@@ -587,5 +898,30 @@ private fun <T> OptionRow(
             val option = options[index]
             PokeChip(label(option), option == selected, { onSelect(option) })
         }
+    }
+}
+
+/**
+ * A battle background showing only its scenery, cropped to fill [modifier]'s box the way the
+ * widget crops it. Showdown's Gen 3 and 4 images carry a whole battle screen around the field.
+ */
+@Composable
+private fun BattleBackgroundImage(background: BattleBackground, modifier: Modifier) {
+    val scenery = background.sceneryBox()
+    BoxWithConstraints(modifier.clipToBounds()) {
+        val boxW = maxWidth.value
+        val boxH = maxHeight.value
+        val scale = maxOf(boxW / scenery.width, boxH / scenery.height)
+        val dx = -scenery.left * scale - (scenery.width * scale - boxW) / 2
+        val dy = -scenery.top * scale - (scenery.height * scale - boxH) / 2
+        AsyncImage(
+            model = background.url,
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .wrapContentSize(Alignment.TopStart, unbounded = true)
+                .offset(dx.dp, dy.dp)
+                .requiredSize((background.w * scale).dp, (background.h * scale).dp),
+        )
     }
 }

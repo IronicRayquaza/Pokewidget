@@ -384,3 +384,34 @@ export const VEEKUN_SETS = {
 export const SKIPPED_SETS = {
   'other/dream-world': 'SVG only; no raster pipeline in the app.',
 };
+
+/**
+ * How many source pixels a *large* Pokémon occupies in each kind of set — the yardstick
+ * the widget's "True size" option measures every sprite against, so Torterra is drawn
+ * bigger than Psyduck instead of both being stretched to fill the widget.
+ *
+ * Keyed by hardware, because a console's sprites share one scale. Showdown's figure is
+ * measured, not guessed: across a 42-species sample of its GIFs the 90th percentile of
+ * max(width, height) is 148 px, so 140 lets the biggest few fill the widget. Sets not
+ * listed here (3D renders and artwork) have no common scale, so "True size" behaves like
+ * "Fill the widget" for them. A set's own `referencePx` in the tables above wins.
+ */
+export const REFERENCE_PX_BY_HARDWARE = {
+  'Fan-made': 140,
+  'Game Boy': 56,
+  'Game Boy Color': 56,
+  'Game Boy Advance': 64,
+  'Nintendo DS': 96,
+};
+
+/** Icon sets are drawn to a fixed icon grid, not a battle-sprite scale. */
+export const REFERENCE_PX_BY_PATH = {
+  'versions/generation-v/icons/animated': 32,
+  'versions/generation-v/icons': 32,
+  'versions/generation-vii/icons': 40,
+  'versions/generation-viii/icons': 68,
+};
+
+export function referencePxFor(setPath, meta) {
+  return meta.referencePx ?? REFERENCE_PX_BY_PATH[setPath] ?? REFERENCE_PX_BY_HARDWARE[meta.hardware];
+}

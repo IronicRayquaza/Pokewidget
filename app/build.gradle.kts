@@ -31,8 +31,8 @@ android {
         applicationId = "com.pokewidgets.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 6
+        versionName = "1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -205,7 +205,6 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
     implementation(libs.okhttp)
-    implementation(libs.glide.gifdecoder)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)

@@ -26,7 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SET_META, VARIANT_SEGMENTS, SKIPPED_SETS, VEEKUN_SETS } from './sets.config.mjs';
+import { SET_META, VARIANT_SEGMENTS, SKIPPED_SETS, VEEKUN_SETS, referencePxFor } from './sets.config.mjs';
 
 const SPRITES_SHA = 'c10459b9b0129eaca5c5d9b1cac65336debb1d08';
 const REPO = 'PokeAPI/sprites';
@@ -443,6 +443,7 @@ async function main() {
       order: m.order,
       ...(m.note ? { note: m.note } : {}),
       variants: variantMap,
+      ...(referencePxFor(setPath, m) ? { referencePx: referencePxFor(setPath, m) } : {}),
     });
   }
 
@@ -474,6 +475,7 @@ async function main() {
       order: m.order,
       ...(m.note ? { note: m.note } : {}),
       variants: variantMap,
+      ...(referencePxFor(setPath, m) ? { referencePx: referencePxFor(setPath, m) } : {}),
       provider: 'veekun',
       ...(m.frameDirs ? { frameDirs: m.frameDirs } : {}),
       ...(m.frameDelaysMs ? { frameDelaysMs: m.frameDelaysMs } : {}),

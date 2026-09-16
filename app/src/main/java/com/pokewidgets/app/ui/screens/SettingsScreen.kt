@@ -230,6 +230,12 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.height(10.dp))
                 Caption(
+                    "Trainer sprites and battle backgrounds come from Pokémon Showdown. " +
+                        "Trainers seen from behind are taken from the games themselves, via " +
+                        "the pret decompilation projects.",
+                )
+                Spacer(Modifier.height(10.dp))
+                Caption(
                     "Pokémon and all related art are trademarks of Nintendo, Creatures Inc. " +
                         "and GAME FREAK inc. This is an unofficial fan project with no " +
                         "affiliation.",

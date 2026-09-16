@@ -40,8 +40,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** One sprite set shown in a Pokémon's detail sheet, with the URL to preview it. */
-data class SetPreview(val set: SpriteSet, val url: String?)
+/**
+ * A sprite set shown as a picture of one Pokémon in it.
+ *
+ * @param shinyUrl the same Pokémon's shiny in this set, or null when the set has none — so a
+ *   shiny toggle can swap the whole grid at once and say which games never drew one.
+ */
+data class SetPreview(val set: SpriteSet, val url: String?, val shinyUrl: String? = null)
 
 /** A widget the user has already placed, so it can be edited from inside the app. */
 data class PlacedWidget(
@@ -182,7 +187,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val sets = catalog.setsFor(entry.id)
                 .sortedWith(compareByDescending<SpriteSet> { it.animated }.thenBy { it.order })
                 .map { set ->
-                    SetPreview(set, source.spriteUrl(set, SpriteKey(set.id, entry.id)))
+                    SetPreview(
+                        set = set,
+                        url = source.spriteUrl(set, SpriteKey(set.id, entry.id)),
+                        shinyUrl = if (set.covers(entry.id, back = false, shiny = true, female = false, style = null)) {
+                            source.spriteUrl(set, SpriteKey(set.id, entry.id, shiny = true))
+                        } else {
+                            null
+                        },
+                    )
                 }
             _state.update { it.copy(detailSets = sets) }
         }
@@ -204,7 +217,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * no callback the widget is placed and then simply never rendered, which is why
      * adding a Pokemon from inside the app produced an empty square on the home screen.
      */
-    fun requestPin(pokemonId: Int, setId: String) {
+    fun requestPin(pokemonId: Int, setId: String, shiny: Boolean = false) {
         val context = getApplication<Application>()
         val manager = AppWidgetManager.getInstance(context)
         if (!manager.isRequestPinAppWidgetSupported) return
@@ -212,7 +225,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         launchSafely("add the widget") {
             // The pin API carries no payload and never runs the configuration activity,
             // so stash the choice for the provider to adopt when the widget arrives.
-            store.putPendingPin(WidgetConfig(pokemonId = pokemonId, setId = setId))
+            // Shiny is carried only where the set really has one, so the choice made on the
+            // detail page can never place a widget that 404s.
+            val set = catalog.set(setId)
+            val keepShiny = shiny && set?.covers(pokemonId, back = false, shiny = true, female = false, style = null) == true
+            store.putPendingPin(WidgetConfig(pokemonId = pokemonId, setId = setId, shiny = keepShiny))
 
             val provider = ComponentName(context, PokemonWidgetProvider.Medium::class.java)
             val placed = PendingIntent.getBroadcast(

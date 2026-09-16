@@ -2,6 +2,50 @@
 
 What changed, written for someone using the app rather than reading the diff.
 
+## 1.5
+
+Installs over 1.4 and keeps your widgets. Thanks to everyone who sent feedback after the first
+release — nearly everything below came from you.
+
+**Fixes**
+
+- **Animated sprites really fill the widget now.** "Fill the widget" and "4×" were being quietly
+  overruled by the widget's memory limit, so big animated Pokémon came out small — Torterra
+  ended up smaller than Psyduck. The size you pick is now the size you get; on a tight memory
+  budget the sprite is drawn a little softer instead of smaller.
+- **New size option: True size.** Big Pokémon look big and small ones look small, instead of
+  every Pokémon being stretched to fill the widget.
+- **No more doubled sprites.** Some Showdown sprites, Fidough among them, showed two copies
+  stacked on top of each other. The GIF decoder has been replaced with one that handles those
+  frames correctly.
+- **Cries play the moment you tap.** They are now kept ready to play instead of being loaded on
+  every tap, a second tap no longer waits for the first cry to finish, and a cry that failed
+  to download mid-write can no longer come out clipped.
+- **Widgets are sized for the space they really have**, which some launchers report confusingly
+  in portrait.
+
+**New**
+
+- **Mirror a sprite** so your Pokémon can face the other way. It's next to the preview, and
+  also available as a tap action.
+- **Trainers.** Pair your Pokémon with a trainer: gym leaders, Elite Four, champions, rivals,
+  villains and ordinary trainer classes from every region. Side by side, or as a **battle
+  scene** seen from behind. Where a game really drew the player from behind (Red, Leaf, Ethan,
+  Kris, Brendan, May, Wally, Steven) that sprite is used; otherwise the front is shown turned
+  around, and the app says so.
+- **Battle backgrounds.** A library of battlefields from the games, as an alternative to a
+  plain colour behind the sprite.
+- **Shiny is easy to find.** The Shiny switch now sits right under the preview and is always
+  there. If a sprite set has no shiny of your Pokémon, tapping it tells you why instead of the
+  option silently disappearing. The Pokémon page has a Shiny switch too, and "Add to home
+  screen" keeps it.
+
+None of this changes a widget you have already placed, or a new one you don't customise:
+trainers, backgrounds and mirroring are all off until you turn them on.
+
+Trainer sprites and battle backgrounds come from [Pokémon Showdown](https://play.pokemonshowdown.com);
+trainers seen from behind come from the [pret](https://github.com/pret) game decompilations.
+
 ## 1.4
 
 **You have to uninstall the old version first.** This is the first build signed with a real

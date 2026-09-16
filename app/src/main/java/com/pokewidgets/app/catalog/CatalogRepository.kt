@@ -24,6 +24,8 @@ class CatalogRepository private constructor(context: Context) {
 
     @Volatile private var pokemon: List<PokemonEntry>? = null
     @Volatile private var setIndex: SpriteSetIndex? = null
+    @Volatile private var trainers: TrainerIndex? = null
+    @Volatile private var backgrounds: BackgroundIndex? = null
     @Volatile private var iconOffsets: Map<Int, Pair<Int, Int>>? = null
     @Volatile private var iconBlob: ByteArray? = null
     private val iconLock = Mutex()
@@ -55,6 +57,22 @@ class CatalogRepository private constructor(context: Context) {
     }
 
     suspend fun set(id: String): SpriteSet? = sets().firstOrNull { it.id == id }
+
+    /** Every trainer sprite, for the optional trainer pairing. Bundled, so it works offline. */
+    suspend fun trainers(): TrainerIndex = trainers ?: loadLock.withLock {
+        trainers ?: withContext(Dispatchers.IO) {
+            val text = appContext.assets.open("trainers.json").bufferedReader().use { it.readText() }
+            json.decodeFromString<TrainerIndex>(text).also { trainers = it }
+        }
+    }
+
+    /** The battle-background library. */
+    suspend fun backgrounds(): BackgroundIndex = backgrounds ?: loadLock.withLock {
+        backgrounds ?: withContext(Dispatchers.IO) {
+            val text = appContext.assets.open("backgrounds.json").bufferedReader().use { it.readText() }
+            json.decodeFromString<BackgroundIndex>(text).also { backgrounds = it }
+        }
+    }
 
     suspend fun entry(id: Int): PokemonEntry? = pokemon().firstOrNull { it.id == id }
 

@@ -17,9 +17,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.pokewidgets.app.ui.screens.ConfigActions
 import com.pokewidgets.app.ui.screens.ConfigScreen
 import com.pokewidgets.app.ui.screens.PokemonPicker
 import com.pokewidgets.app.ui.screens.SpriteSetPickerScreen
+import com.pokewidgets.app.ui.screens.TrainerPickerScreen
 import com.pokewidgets.app.ui.theme.Paper
 import com.pokewidgets.app.ui.theme.PokeWidgetTheme
 
@@ -103,10 +105,24 @@ fun ConfigFlow(widgetId: Int, onDone: () -> Unit) {
             onBack = { step = ConfigStep.SETTINGS },
         )
 
+        ConfigStep.TRAINER -> TrainerPickerScreen(
+            index = state.trainers,
+            selectedId = state.config.trainerId,
+            onSelect = viewModel::selectTrainer,
+            onBack = { step = ConfigStep.SETTINGS },
+        )
+
         ConfigStep.SETTINGS -> ConfigScreen(
             state = state,
             onPickPokemon = { step = ConfigStep.POKEMON },
             onPickSet = { step = ConfigStep.SPRITE_SET },
+            onPickTrainer = { step = ConfigStep.TRAINER },
+            actions = ConfigActions(
+                toggleShiny = viewModel::toggleShiny,
+                selectTrainer = viewModel::selectTrainer,
+                setBackgroundMode = viewModel::setBackgroundMode,
+                applyBattleScene = viewModel::applyBattleScene,
+            ),
             onUpdate = viewModel::update,
             onSave = { viewModel.save(onDone) },
         )
@@ -120,4 +136,4 @@ fun ConfigFlow(widgetId: Int, onDone: () -> Unit) {
  * a sprite set means comparing a lot of similar-looking things, and neither comparison
  * fits in a row or survives a container that dismisses on a downward flick.
  */
-private enum class ConfigStep { SETTINGS, POKEMON, SPRITE_SET }
+private enum class ConfigStep { SETTINGS, POKEMON, SPRITE_SET, TRAINER }

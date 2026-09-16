@@ -74,7 +74,7 @@ fun MainScreen(
     onAnimatedOnly: (Boolean) -> Unit,
     onOpenDetail: (PokemonEntry) -> Unit,
     onCloseDetail: () -> Unit,
-    onPin: (Int, String) -> Unit,
+    onPin: (Int, String, Boolean) -> Unit,
     onEditWidget: (Int) -> Unit,
     onClearCache: () -> Unit,
     onPlaceQuery: (String) -> Unit,

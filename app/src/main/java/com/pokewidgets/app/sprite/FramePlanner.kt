@@ -1,5 +1,6 @@
 package com.pokewidgets.app.sprite
 
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -97,28 +98,52 @@ object FramePlanner {
         /** Pixel size of the widget's content box. */
         val targetWidthPx: Int,
         val targetHeightPx: Int,
-        /** Upper bound on integer upscale, from the widget's "fill" setting. */
-        val maxScale: Int = MAX_SCALE,
+        /**
+         * How many screen pixels each source pixel should cover — see [displayScale]. Null
+         * means "fill the widget", which is also what every caller before 1.5 meant.
+         */
+        val displayScale: Double? = null,
         val desiredFps: Int = 12,
         val budgetBytes: Long,
-    )
+    ) {
+        val resolvedDisplayScale: Double
+            get() = displayScale ?: displayScale(
+                source.contentWidth, source.contentHeight, targetWidthPx, targetHeightPx,
+            )
+    }
+
+    /**
+     * How a plan's bitmaps reach the screen.
+     *
+     * [SHARP] bitmaps are already the size they are shown at, drawn nearest-neighbour, and
+     * sit in a `scaleType="center"` ImageView that never touches them. [SCALED] bitmaps are
+     * stored at a smaller whole-number multiple and stretched the rest of the way by a
+     * `fitCenter` ImageView — slightly soft, but the same size on screen.
+     */
+    enum class Tier { SHARP, SCALED }
 
     /**
      * @param sourceIndices which source frame each uniform step displays. Repeats are
      *   expected and desirable: the renderer hands the *same* `Bitmap` instance to every
      *   step that maps to the same source frame, and `RemoteViews.BitmapCache` dedupes
      *   by object identity, so a long hold costs one bitmap rather than a dozen.
+     * @param outWidth size of each stored bitmap — what the memory budget pays for.
+     * @param displayWidth size the sprite occupies on screen. Never smaller than asked for.
      */
     data class Plan(
         val frameIntervalMs: Int,
         val sourceIndices: List<Int>,
-        val scale: Int,
         val outWidth: Int,
         val outHeight: Int,
+        val displayWidth: Int,
+        val displayHeight: Int,
         val fps: Int,
         val truncated: Boolean,
     ) {
         val stepCount: Int get() = sourceIndices.size
+
+        val tier: Tier
+            get() = if (outWidth == displayWidth && outHeight == displayHeight) Tier.SHARP else Tier.SCALED
 
         /**
          * The frames that actually need a bitmap. Already canonical, so two steps showing
@@ -136,67 +161,114 @@ object FramePlanner {
     }
 
     /**
-     * Fits the animation into the budget by spending whichever resource is cheapest to
-     * lose at that moment:
+     * Makes the sprite as big as the widget asked for, then fits that into the budget by
+     * spending whichever resource is cheapest to lose at that moment.
      *
-     *  - While the sprite is already drawn at more than [GENEROUS_SCALE], shrink it. The
-     *    difference between 8x and 6x pixel art is invisible; the difference between
-     *    12 fps and 8 fps is not.
-     *  - Once it is down to a modest scale, defend the size and drop frame rate instead —
-     *    a tiny sprite on a big widget reads as broken, a slightly choppy one does not.
-     *  - Drawing at 1:1 is the last size to give up, not the first: it is worth one rung
-     *    of frame rate below the comfortable floor to avoid it. See [RESCUE_FPS].
-     *  - Only once nothing fits at any comfortable rate and any size do we accept the
-     *    strobier rates — and there size wins again, for the same reason.
+     * **Size on screen is never what gets traded.** Up to 1.4 the only lever was an integer
+     * upscale baked into the bitmap, so a big sprite with a long loop — Torterra — dropped to
+     * 2x and ended up physically smaller than Psyduck, and "Fill the widget" and "4x" were
+     * both quietly ignored. The widget's memory ceiling counts *bitmap* bytes, not pixels on
+     * screen, so now the bitmap may be stored smaller and stretched by the ImageView instead:
+     *
+     *  - Best: bitmaps at the exact display size, pixel-perfect ([Tier.SHARP]).
+     *  - While the stored multiple is above [GENEROUS_SCALE], lower it. A 4x-stored sprite
+     *    stretched to 8x is barely softer; 12 fps dropping to 8 fps is plainly visible.
+     *  - Once down to a modest multiple, defend it and drop frame rate instead.
+     *  - Storing at 1:1 — the softest stretch — is the last multiple given up, not the
+     *    first: it is worth one rung of frame rate below the comfortable floor. See
+     *    [RESCUE_FPS].
+     *  - Only once nothing fits at any comfortable rate do we accept strobier rates.
      *  - Only after all of that do we truncate the loop.
      */
     fun plan(request: Request): Plan {
         val src = request.source
-        val maxScale = fitScale(
-            contentWidth = src.contentWidth,
-            contentHeight = src.contentHeight,
-            targetWidthPx = request.targetWidthPx,
-            targetHeightPx = request.targetHeightPx,
-            maxScale = request.maxScale,
-        )
+        val scale = request.resolvedDisplayScale.coerceAtLeast(MIN_DISPLAY_SCALE)
+        val dispW = (src.contentWidth * scale).roundToInt().coerceAtLeast(1)
+        val dispH = (src.contentHeight * scale).roundToInt().coerceAtLeast(1)
+        val budget = request.budgetBytes
 
         val startFps = FPS_LADDER.firstOrNull { it <= request.desiredFps } ?: FPS_LADDER.last()
         val comfortable = FPS_LADDER.filter { it <= startFps && it >= COMFORTABLE_MIN_FPS }
             .ifEmpty { listOf(startFps) }
+        val strobe = FPS_LADDER.filter { it < COMFORTABLE_MIN_FPS }
 
-        // Pass 1: keep the requested frame rate, spending only the "free" scale above
-        // GENEROUS_SCALE. This is what stops a 2x2 Pikachu costing 11 MB at 8x.
-        for (scale in maxScale downTo min(GENEROUS_SCALE, maxScale)) {
-            candidate(src, scale, startFps, request.budgetBytes)?.let { return it }
+        fun at(multiple: Int, fps: Int): Plan? = candidate(
+            src, src.contentWidth * multiple, src.contentHeight * multiple, dispW, dispH, fps, budget,
+        )
+
+        fun sharp(fps: Int): Plan? = candidate(src, dispW, dispH, dispW, dispH, fps, budget)
+
+        // Pass 1: exactly as asked — full size, pixel-perfect, at the requested rate.
+        sharp(startFps)?.let { return it }
+
+        // Art larger than the widget is shrunk to fit, and a shrunk bitmap cannot be stored
+        // any smaller without the ImageView stretching it back up. Only frame rate is left.
+        val top = floor(scale).toInt()
+        if (top < 1) {
+            for (fps in comfortable + strobe) sharp(fps)?.let { return it }
+            return truncatedPlan(src, dispW, dispH, dispW, dispH, budget)
         }
-        // Pass 2: size now matters, so trade frame rate at each remaining scale — but not
-        // all the way down to 1:1 yet. See RESCUE_FPS.
-        for (scale in min(GENEROUS_SCALE, maxScale) downTo 2) {
-            for (fps in comfortable) {
-                candidate(src, scale, fps, request.budgetBytes)?.let { return it }
-            }
+        val generous = min(GENEROUS_SCALE, top)
+
+        // Pass 2: keep the frame rate, give up sharpness above GENEROUS_SCALE.
+        for (multiple in top downTo generous) at(multiple, startFps)?.let { return it }
+        // Pass 3: the stored multiple now matters, so trade frame rate at each one — but
+        // not all the way down to 1:1 yet.
+        for (multiple in generous downTo 2) {
+            for (fps in comfortable) at(multiple, fps)?.let { return it }
         }
-        // Pass 3: one rung below comfort, spent solely on keeping an upscale.
-        for (scale in min(GENEROUS_SCALE, maxScale) downTo 2) {
-            candidate(src, scale, RESCUE_FPS, request.budgetBytes)?.let { return it }
+        // Pass 4: one rung below comfort, spent solely on a crisper stretch.
+        for (multiple in generous downTo 2) at(multiple, RESCUE_FPS)?.let { return it }
+        // Pass 5: 1:1 storage, at the best rate it can hold.
+        for (fps in comfortable) at(1, fps)?.let { return it }
+        // Pass 6: nothing fits at a comfortable rate at any multiple. Smoothness is already
+        // conceded, so spend the strobier rates on sharpness before truncating.
+        for (multiple in top downTo 1) {
+            for (fps in strobe) at(multiple, fps)?.let { return it }
         }
-        // Pass 4: 1:1, at the best rate it can hold.
-        for (fps in comfortable) {
-            candidate(src, 1, fps, request.budgetBytes)?.let { return it }
+        // A full loop does not fit at all. Truncate it; the renderer degrades to a still at
+        // worst — still drawn at full size.
+        return truncatedPlan(src, src.contentWidth, src.contentHeight, dispW, dispH, budget)
+    }
+
+    /** Leaves a little air around a sprite that fills its widget, so it never kisses an edge. */
+    const val FIT_MARGIN = 0.92
+
+    /** A guard against a zero-sized plan; no real widget asks for less. */
+    private const val MIN_DISPLAY_SCALE = 0.05
+
+    /**
+     * How large to draw a sprite: the number of screen pixels per source pixel.
+     *
+     * @param multiple an exact multiple ("4x"), clamped so the sprite still fits the box.
+     * @param referencePx "True size": the source size of a *large* Pokémon in this set (see
+     *   `SpriteSet.referencePx`). Every sprite is drawn at the scale that makes a sprite of
+     *   that size fill the widget, so relative sizes between species survive. Wins over
+     *   [multiple] when both are given.
+     *
+     * With neither, the sprite fills the widget.
+     */
+    fun displayScale(
+        contentWidth: Int,
+        contentHeight: Int,
+        targetWidthPx: Int,
+        targetHeightPx: Int,
+        multiple: Int? = null,
+        referencePx: Int? = null,
+    ): Double {
+        if (targetWidthPx <= 0 || targetHeightPx <= 0 || contentWidth <= 0 || contentHeight <= 0) {
+            return 1.0
         }
-        // Pass 5: nothing fits at a comfortable rate, at any size. Smoothness is already
-        // conceded, so spend the strobier rates on size rather than dropping straight to
-        // 1:1 — which is what used to happen to every Black/White sprite with a loop
-        // longer than about seven seconds, leaving a 74px Zapdos marooned in the middle of
-        // a 350px widget with four fifths of its budget unspent.
-        for (scale in maxScale downTo 1) {
-            for (fps in FPS_LADDER.filter { it < COMFORTABLE_MIN_FPS }) {
-                candidate(src, scale, fps, request.budgetBytes)?.let { return it }
-            }
+        val fit = min(
+            targetWidthPx.toDouble() / contentWidth,
+            targetHeightPx.toDouble() / contentHeight,
+        ) * FIT_MARGIN
+        return when {
+            referencePx != null && referencePx > 0 ->
+                min(fit, min(targetWidthPx, targetHeightPx) * FIT_MARGIN / referencePx)
+            multiple != null -> min(multiple.toDouble(), fit)
+            else -> fit
         }
-        // A full loop of this sprite does not fit at all. Truncate it; the renderer
-        // degrades to a still image at worst.
-        return truncatedPlan(src, request.budgetBytes)
     }
 
     /** Largest integer upscale that still fits the widget's content box. */
@@ -213,29 +285,41 @@ object FramePlanner {
         return min(min(byWidth, byHeight), min(maxScale, MAX_SCALE)).coerceAtLeast(1)
     }
 
-    private fun candidate(src: Source, scale: Int, fps: Int, budget: Long): Plan? {
+    private fun candidate(
+        src: Source,
+        outW: Int,
+        outH: Int,
+        dispW: Int,
+        dispH: Int,
+        fps: Int,
+        budget: Long,
+    ): Plan? {
         val raw = resample(src, fps)
         if (raw.size > MAX_FRAMES) return null
         // Collapse onto canonical frames so repeated artwork is charged once.
         val indices = raw.map { src.canonicalOf(it) }
-        val outW = src.contentWidth * scale
-        val outH = src.contentHeight * scale
         val bytes = indices.distinct().size.toLong() * outW * outH * 4L
         if (bytes > budget) return null
         return Plan(
             frameIntervalMs = intervalFor(src, indices.size),
             sourceIndices = indices,
-            scale = scale,
             outWidth = outW,
             outHeight = outH,
+            displayWidth = dispW,
+            displayHeight = dispH,
             fps = fps,
             truncated = false,
         )
     }
 
-    private fun truncatedPlan(src: Source, budget: Long): Plan {
-        val outW = src.contentWidth
-        val outH = src.contentHeight
+    private fun truncatedPlan(
+        src: Source,
+        outW: Int,
+        outH: Int,
+        dispW: Int,
+        dispH: Int,
+        budget: Long,
+    ): Plan {
         val perFrame = outW.toLong() * outH * 4L
         val affordable = max(1L, budget / max(1L, perFrame)).toInt()
         val indices = resample(src, FPS_LADDER.last())
@@ -244,9 +328,10 @@ object FramePlanner {
         return Plan(
             frameIntervalMs = intervalFor(src, indices.size),
             sourceIndices = indices.ifEmpty { listOf(0) },
-            scale = 1,
             outWidth = outW,
             outHeight = outH,
+            displayWidth = dispW,
+            displayHeight = dispH,
             fps = FPS_LADDER.last(),
             truncated = true,
         )

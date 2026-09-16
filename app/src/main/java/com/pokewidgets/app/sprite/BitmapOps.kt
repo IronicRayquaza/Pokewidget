@@ -3,6 +3,7 @@ package com.pokewidgets.app.sprite
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
@@ -177,6 +178,44 @@ object BitmapOps {
     }
 
     /**
+     * Crops, then resizes to an exact pixel size.
+     *
+     * Growing is nearest-neighbour, even by a fractional factor: a 4.3× sprite gets a few
+     * source pixels one screen pixel wider than their neighbours, which is invisible, while
+     * bilinear would blur every edge. Shrinking — only ever needed for high-resolution renders
+     * that overflow the widget — is filtered, because those are not pixel art.
+     *
+     * Like [cropAndScale], always returns a bitmap distinct from [source].
+     */
+    fun cropScaleTo(source: Bitmap, bounds: Rect, widthPx: Int, heightPx: Int): Bitmap {
+        val cropped = cropAndScale(source, bounds, 1)
+        val w = widthPx.coerceAtLeast(1)
+        val h = heightPx.coerceAtLeast(1)
+        if (w == cropped.width && h == cropped.height) return cropped
+        val shrinking = w < cropped.width || h < cropped.height
+        val scaled = Bitmap.createScaledBitmap(cropped, w, h, shrinking)
+        if (scaled !== cropped) cropped.recycle()
+        return scaled
+    }
+
+    /**
+     * A horizontally mirrored copy, so the sprite faces the other way. Recycles [source].
+     *
+     * Done to the bitmap rather than the view: `View.setScaleX` only became callable through
+     * `RemoteViews` in API 31, and a flip that worked on some phones and silently did
+     * nothing on others would be worse than no flip at all.
+     */
+    fun mirrored(source: Bitmap): Bitmap {
+        val matrix = Matrix().apply {
+            setScale(-1f, 1f)
+            postTranslate(source.width.toFloat(), 0f)
+        }
+        val out = Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, false)
+        if (out !== source) source.recycle()
+        return out
+    }
+
+    /**
      * Resizes to an exact pixel size with nearest-neighbour sampling.
      *
      * Unlike [cropAndScale] this permits a non-integer ratio, because the procedural idle
@@ -211,6 +250,28 @@ object BitmapOps {
             cornerRadiusPx, cornerRadiusPx, paint,
         )
         return bmp
+    }
+
+    /**
+     * A battle background cut to the widget's shape, at [widthPx]×[heightPx], with rounded
+     * corners. Painted scenery rather than sprite art, so it is filtered when resized — and
+     * it is usually stored smaller than the widget and stretched, to leave the memory budget
+     * for the Pokémon.
+     *
+     * @param crop the part of [source] to use; see `SceneLayout.coverCrop`.
+     */
+    fun battlePlate(source: Bitmap, crop: Rect, widthPx: Int, heightPx: Int, cornerRadiusPx: Float): Bitmap {
+        val out = Bitmap.createBitmap(widthPx.coerceAtLeast(1), heightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        val bounds = RectF(0f, 0f, out.width.toFloat(), out.height.toFloat())
+        if (cornerRadiusPx > 0f) {
+            val clip = android.graphics.Path().apply {
+                addRoundRect(bounds, cornerRadiusPx, cornerRadiusPx, android.graphics.Path.Direction.CW)
+            }
+            canvas.clipPath(clip)
+        }
+        canvas.drawBitmap(source, crop, bounds, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
+        return out
     }
 
     /** Packs frames left-to-right into one sheet so the disk cache is a single file. */

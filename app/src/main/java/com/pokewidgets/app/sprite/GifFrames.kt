@@ -3,9 +3,6 @@ package com.pokewidgets.app.sprite
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
-import com.bumptech.glide.gifdecoder.GifDecoder
-import com.bumptech.glide.gifdecoder.GifHeaderParser
-import com.bumptech.glide.gifdecoder.StandardGifDecoder
 
 /** A decoded source animation: one bitmap and one delay per frame. */
 class DecodedSprite(
@@ -21,9 +18,9 @@ class DecodedSprite(
 /**
  * Decodes sprite bytes into frames.
  *
- * GIFs go through Glide's standalone `gifdecoder`, which handles the disposal-method
- * bookkeeping correctly — Gen 5 sprites lean on frame disposal heavily, and a naive
- * decoder leaves smears behind the Pokémon.
+ * GIFs go through [GifDecoder], which follows the spec's disposal rules — Gen 5 and Showdown
+ * sprites lean on frame disposal heavily, and getting it wrong leaves smears or a second,
+ * ghostly copy of the Pokémon behind the first.
  */
 object GifFrames {
 
@@ -103,58 +100,22 @@ object GifFrames {
     }
 
     private fun decodeGif(bytes: ByteArray): DecodedSprite? {
-        val header = GifHeaderParser().apply { setData(bytes) }.parseHeader()
-        if (header.numFrames <= 0) {
-            Log.w(TAG, "GIF reported ${header.numFrames} frames")
+        val frames = ArrayList<Bitmap>()
+        val delays = ArrayList<Int>()
+        val info = GifDecoder.decode(bytes, maxFrames = MAX_SOURCE_FRAMES) { argb, width, height, delayMs ->
+            // createBitmap copies the pixels, so the decoder is free to reuse its canvas.
+            frames.add(Bitmap.createBitmap(argb, width, height, Bitmap.Config.ARGB_8888))
+            delays.add(delayMs)
+            true
+        }
+        if (info == null) {
+            Log.w(TAG, "not a GIF")
             return null
         }
-
-        val decoder = StandardGifDecoder(SimpleBitmapProvider).apply {
-            setData(header, bytes)
-            setDefaultBitmapConfig(Bitmap.Config.ARGB_8888)
+        if (frames.isEmpty()) {
+            Log.w(TAG, "GIF had no decodable frames")
+            return null
         }
-
-        val frames = ArrayList<Bitmap>(header.numFrames)
-        val delays = ArrayList<Int>(header.numFrames)
-        val count = minOf(header.numFrames, MAX_SOURCE_FRAMES)
-
-        for (i in 0 until count) {
-            decoder.advance()
-            val frame = decoder.nextFrame
-            if (frame == null) {
-                Log.w(TAG, "GIF frame $i decoded as null; keeping the ${frames.size} decoded so far")
-                break
-            }
-            // The decoder reuses its own buffer between frames, so each one must be copied.
-            frames.add(frame.copy(Bitmap.Config.ARGB_8888, false) ?: frame)
-
-            // Browsers clamp 0 ms and 10 ms delays to 100 ms; sprites authored against that
-            // behaviour animate at a crawl if the raw value is taken literally.
-            val raw = decoder.getDelay(i)
-            delays.add(if (raw <= 10) 100 else raw)
-        }
-        decoder.clear()
-
-        if (frames.isEmpty()) return null
         return DecodedSprite(frames, delays)
-    }
-
-    /**
-     * Glide's decoder wants a bitmap pool. The widget decodes one sprite at a time and
-     * then throws everything away, so plain allocation is simpler and no slower here.
-     */
-    private object SimpleBitmapProvider : GifDecoder.BitmapProvider {
-        override fun obtain(width: Int, height: Int, config: Bitmap.Config): Bitmap =
-            Bitmap.createBitmap(width, height, config)
-
-        override fun release(bitmap: Bitmap) = bitmap.recycle()
-
-        override fun obtainByteArray(size: Int): ByteArray = ByteArray(size)
-
-        override fun release(bytes: ByteArray) = Unit
-
-        override fun obtainIntArray(size: Int): IntArray = IntArray(size)
-
-        override fun release(array: IntArray) = Unit
     }
 }

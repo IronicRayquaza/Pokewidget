@@ -42,11 +42,17 @@ class WidgetConfigStore(context: Context) {
             prefs[Keys.shiny(widgetId)] = config.shiny
             prefs[Keys.back(widgetId)] = config.back
             prefs[Keys.female(widgetId)] = config.female
-            val styleKey = Keys.style(widgetId)
-            if (config.style != null) prefs[styleKey] = config.style else prefs.remove(styleKey)
+            prefs[Keys.flipH(widgetId)] = config.flipHorizontal
+            putOrRemove(prefs, Keys.style(widgetId), config.style)
             prefs[Keys.showBg(widgetId)] = config.showBackground
             prefs[Keys.bgColor(widgetId)] = config.backgroundColor
             prefs[Keys.corner(widgetId)] = config.cornerRadiusDp
+            putOrRemove(prefs, Keys.bgId(widgetId), config.backgroundId)
+            putOrRemove(prefs, Keys.trainer(widgetId), config.trainerId)
+            prefs[Keys.trainerPose(widgetId)] = config.trainerPose.name
+            prefs[Keys.trainerSide(widgetId)] = config.trainerSide.name
+            prefs[Keys.trainerFlip(widgetId)] = config.trainerFlip
+            prefs[Keys.scene(widgetId)] = config.scene.name
             prefs[Keys.cry(widgetId)] = config.cryEnabled
             prefs[Keys.legacyCry(widgetId)] = config.legacyCry
             prefs[Keys.smoothness(widgetId)] = config.smoothness.name
@@ -127,10 +133,17 @@ class WidgetConfigStore(context: Context) {
             shiny = prefs[Keys.shiny(id)] ?: d.shiny,
             back = prefs[Keys.back(id)] ?: d.back,
             female = prefs[Keys.female(id)] ?: d.female,
+            flipHorizontal = prefs[Keys.flipH(id)] ?: d.flipHorizontal,
             style = prefs[Keys.style(id)],
             showBackground = prefs[Keys.showBg(id)] ?: d.showBackground,
             backgroundColor = prefs[Keys.bgColor(id)] ?: d.backgroundColor,
             cornerRadiusDp = prefs[Keys.corner(id)] ?: d.cornerRadiusDp,
+            backgroundId = prefs[Keys.bgId(id)],
+            trainerId = prefs[Keys.trainer(id)],
+            trainerPose = prefs[Keys.trainerPose(id)].toEnum(d.trainerPose),
+            trainerSide = prefs[Keys.trainerSide(id)].toEnum(d.trainerSide),
+            trainerFlip = prefs[Keys.trainerFlip(id)] ?: d.trainerFlip,
+            scene = prefs[Keys.scene(id)].toEnum(d.scene),
             cryEnabled = prefs[Keys.cry(id)] ?: d.cryEnabled,
             legacyCry = prefs[Keys.legacyCry(id)] ?: d.legacyCry,
             smoothness = prefs[Keys.smoothness(id)].toEnum(d.smoothness),
@@ -140,6 +153,15 @@ class WidgetConfigStore(context: Context) {
             liveForm = prefs[Keys.liveForm(id)] ?: d.liveForm,
             excitedUntilMs = prefs[Keys.excited(id)] ?: 0L,
         )
+    }
+
+    /** Optional strings are absent rather than empty, so "none" survives a round trip. */
+    private fun putOrRemove(
+        prefs: androidx.datastore.preferences.core.MutablePreferences,
+        key: Preferences.Key<String>,
+        value: String?,
+    ) {
+        if (value != null) prefs[key] = value else prefs.remove(key)
     }
 
     private inline fun <reified T : Enum<T>> String?.toEnum(fallback: T): T =
@@ -161,10 +183,17 @@ class WidgetConfigStore(context: Context) {
         fun shiny(id: Int) = booleanPreferencesKey("$id.shiny")
         fun back(id: Int) = booleanPreferencesKey("$id.back")
         fun female(id: Int) = booleanPreferencesKey("$id.female")
+        fun flipH(id: Int) = booleanPreferencesKey("$id.flipH")
         fun style(id: Int) = stringPreferencesKey("$id.style")
         fun showBg(id: Int) = booleanPreferencesKey("$id.showBg")
         fun bgColor(id: Int) = intPreferencesKey("$id.bgColor")
         fun corner(id: Int) = intPreferencesKey("$id.corner")
+        fun bgId(id: Int) = stringPreferencesKey("$id.bgId")
+        fun trainer(id: Int) = stringPreferencesKey("$id.trainer")
+        fun trainerPose(id: Int) = stringPreferencesKey("$id.trainerPose")
+        fun trainerSide(id: Int) = stringPreferencesKey("$id.trainerSide")
+        fun trainerFlip(id: Int) = booleanPreferencesKey("$id.trainerFlip")
+        fun scene(id: Int) = stringPreferencesKey("$id.scene")
         fun cry(id: Int) = booleanPreferencesKey("$id.cry")
         fun legacyCry(id: Int) = booleanPreferencesKey("$id.legacyCry")
         fun smoothness(id: Int) = stringPreferencesKey("$id.smoothness")

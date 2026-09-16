@@ -39,6 +39,7 @@ import com.pokewidgets.app.ui.components.PokeButton
 import com.pokewidgets.app.ui.components.PokeIconButton
 import com.pokewidgets.app.ui.components.PokemonIcon
 import com.pokewidgets.app.ui.components.SectionHeader
+import com.pokewidgets.app.ui.components.ShinyChip
 import com.pokewidgets.app.ui.components.SpriteImage
 import com.pokewidgets.app.ui.components.SpriteStage
 import com.pokewidgets.app.ui.components.TypeChip
@@ -64,7 +65,7 @@ fun PokemonDetailScreen(
     sets: List<SetPreview>,
     canPin: Boolean,
     onBack: () -> Unit,
-    onPin: (Int, String) -> Unit,
+    onPin: (Int, String, Boolean) -> Unit,
     onPlayCry: (Int) -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -79,6 +80,14 @@ fun PokemonDetailScreen(
         ?: sets.firstOrNull { it.set.animated }?.set?.id
         ?: sets.firstOrNull()?.set?.id
 
+    // Shiny is a page-level switch rather than a per-set detail, because it is the thing
+    // people come here looking for. Every preview swaps at once; sets that never drew a
+    // shiny keep their normal colours and are counted underneath.
+    var shiny by remember(entry.id) { mutableStateOf(false) }
+    val shown = if (shiny) sets.map { it.copy(url = it.shinyUrl ?: it.url) } else sets
+    val withoutShiny = sets.count { it.shinyUrl == null }
+    val selectedHasShiny = sets.firstOrNull { it.set.id == selected }?.shinyUrl != null
+
     Column(
         Modifier
             .fillMaxSize()
@@ -86,7 +95,7 @@ fun PokemonDetailScreen(
     ) {
         DetailHeader(
             entry = entry,
-            sets = sets,
+            sets = shown,
             onAccent = onAccent,
             onBack = onBack,
             onPlayCry = onPlayCry,
@@ -100,7 +109,7 @@ fun PokemonDetailScreen(
                 .background(Paper),
         ) {
             SpriteSetGrid(
-                sets = sets,
+                sets = shown,
                 selectedSetId = selected,
                 onSelect = { chosenSetId = it },
                 modifier = Modifier.weight(1f),
@@ -109,11 +118,24 @@ fun PokemonDetailScreen(
             ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column {
-                        SectionHeader("Sprite set")
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SectionHeader("Sprite set", Modifier.weight(1f))
+                            ShinyChip(shiny, onToggle = { shiny = !shiny })
+                        }
                         SpriteSetGridCaption(
                             count = sets.size,
                             animated = sets.count { it.set.animated },
                         )
+                        if (shiny && withoutShiny > 0 && sets.isNotEmpty()) {
+                            Spacer(Modifier.height(4.dp))
+                            Caption(
+                                if (withoutShiny == 1) {
+                                    "1 set never drew a shiny, so it shows the normal colours."
+                                } else {
+                                    "$withoutShiny sets never drew a shiny, so they show the normal colours."
+                                },
+                            )
+                        }
                         Spacer(Modifier.height(4.dp))
                     }
                 }
@@ -123,6 +145,7 @@ fun PokemonDetailScreen(
                 entry = entry,
                 canPin = canPin,
                 selectedSetId = selected,
+                shiny = shiny && selectedHasShiny,
                 onPin = onPin,
             )
         }
@@ -242,7 +265,8 @@ private fun DetailFooter(
     entry: PokemonEntry,
     canPin: Boolean,
     selectedSetId: String?,
-    onPin: (Int, String) -> Unit,
+    shiny: Boolean,
+    onPin: (Int, String, Boolean) -> Unit,
 ) {
     Column(
         Modifier
@@ -254,8 +278,8 @@ private fun DetailFooter(
     ) {
         if (canPin) {
             PokeButton(
-                text = "Add " + entry.name + " to home screen",
-                onClick = { selectedSetId?.let { onPin(entry.id, it) } },
+                text = (if (shiny) "Add shiny " else "Add ") + entry.name + " to home screen",
+                onClick = { selectedSetId?.let { onPin(entry.id, it, shiny) } },
                 icon = Icons.Default.Add,
                 enabled = selectedSetId != null,
                 modifier = Modifier.fillMaxWidth(),

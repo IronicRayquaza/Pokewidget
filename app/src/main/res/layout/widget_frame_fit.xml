@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One animation frame whose bitmap is stored smaller than it is shown.
+
+  The planner falls back to this when a sprite at full display size would not fit the
+  widget's bitmap memory ceiling. The ceiling counts bitmap bytes, not screen pixels, so a
+  2x-stored frame stretched to 4x by fitCenter costs a quarter as much and looks the same
+  size. The renderer sets padding so the content box is exactly the display rectangle.
+-->
+<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_frame_image"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:contentDescription="@null"
+    android:scaleType="fitCenter" />

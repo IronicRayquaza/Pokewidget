@@ -1,8 +1,9 @@
 # PokéWidget
 
 Animated Pokémon sprites as Android home-screen widgets. Pick any Pokémon from any
-game's sprite set, choose whether it sits on a background, whether tapping plays its cry,
-and how large it renders.
+game's sprite set, shiny or not, facing either way; stand a trainer beside it or set up a
+battle scene on a battlefield from the games; choose whether tapping plays its cry, and how
+large it renders.
 
 <!-- SCREENSHOT SLOT — images to come. -->
 
@@ -31,8 +32,9 @@ Pokémon and all related art are trademarks of Nintendo, Creatures Inc. and GAME
 is an unofficial fan project with no affiliation, made for fun and given away free.
 
 **No Pokémon assets are bundled with the app or stored in this repository.** Sprites and cries
-are fetched at runtime from the community PokéAPI mirrors and veekun's archive, each pinned to
-a fixed revision.
+are fetched at runtime from the community PokéAPI mirrors and veekun's archive, trainers and
+battle backgrounds from Pokémon Showdown and pret's game decompilations — each pinned to a
+fixed revision where the host allows it.
 
 ## Building it
 
@@ -171,6 +173,31 @@ animating with no connection. Only the searchable catalog and ~1,100 box icons (
 ship in the APK, which keeps it around 10 MB. Cries come from [`PokeAPI/cries`][cries] in
 both `legacy` (the harsher Game Boy-era cry) and `latest` flavours.
 
+### Trainers and battle backgrounds
+
+Pairing a trainer, and the battle backgrounds, are optional extras: a widget only gets
+either because someone chose them.
+
+- **Trainer fronts** are every sprite in Pokémon Showdown's `sprites/trainers/` folder — about
+  1,500, sorted by region and role using the table in
+  [`tools/trainers.config.mjs`](tools/trainers.config.mjs). They are not in any git repository,
+  so the device downloads each one from `play.pokemonshowdown.com` the first time it is picked
+  and keeps it.
+- **Trainer backs** exist only for the player characters the games show from behind at the
+  start of a battle. They come straight from [pret](https://github.com/pret)'s decompilations
+  (pokered, pokecrystal, pokefirered, pokeemerald), pinned to one commit each. The app cuts the
+  standing pose out of the throw-animation strip and applies the Game Boy palettes the ROM
+  stores separately (`TrainerArt`). No game drew anyone else from behind, so everyone else is
+  shown as their front turned around, and the setup screen says so.
+- **Battle backgrounds** are Showdown's, from
+  [`smogon/pokemon-showdown-client`](https://github.com/smogon/pokemon-showdown-client) pinned
+  to one commit. The Gen 3 and Gen 4 ones are drawn as a whole battle screen, so only the field
+  inside is used.
+
+```bash
+node tools/build-trainers.mjs   # writes trainers.json and backgrounds.json into app/src/main/assets/
+```
+
 ### Regenerating the catalog
 
 ```bash
@@ -195,7 +222,7 @@ another machine.
 
 ```bash
 ./gradlew assembleDebug
-./gradlew testDebugUnitTest        # planner, idle styles, sprite-set resolution
+./gradlew testDebugUnitTest        # planner, GIF decoding, scene layout, catalogs, cry cache
 ./gradlew connectedDebugAndroidTest # end-to-end, needs a device and a connection
 ```
 
@@ -207,12 +234,11 @@ AGP 7.4.1 · Gradle 7.6.3 · Kotlin 2.1.0 · compileSdk 34 · minSdk 26.
 the debug key and installable as-is. It carries the `.debug` application id, so it sits
 alongside any other build of the app rather than replacing it.
 
-Release builds are **not** set up: there is no `signingConfigs` block, so `assembleRelease`
-emits an unsigned APK that will not install. `isMinifyEnabled` is on but has never been
-exercised, and the riskiest part is silent rather than loud — `WidgetConfigStore` persists
-enum *names*, and reads them back through a `runCatching { … } ?: fallback`, so an R8 rename
-would not crash, it would quietly reset every widget to its defaults. Shake that out before
-shipping a minified build.
+Release builds are signed from `keystore.properties` (see `keystore.properties.example`); without
+that file `assembleRelease` emits an unsigned APK that will not install. Minification is **off**.
+If it is ever turned on, test it properly first: `WidgetConfigStore` persists enum *names* and
+reads them back through a `runCatching { … } ?: fallback`, so an R8 rename would not crash — it
+would quietly reset every widget to its defaults.
 
 ### Testing
 

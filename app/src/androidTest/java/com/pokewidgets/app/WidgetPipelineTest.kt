@@ -242,11 +242,11 @@ class WidgetPipelineTest {
                 ),
             )
             val scaled = plan.distinctFrames.associateWith { index ->
-                BitmapOps.cropAndScale(decoded.frames[index], bounds, plan.scale)
+                BitmapOps.cropScaleTo(decoded.frames[index], bounds, plan.outWidth, plan.outHeight)
                     .also { distinctBitmaps.add(it) }
             }
             for (index in plan.sourceIndices) {
-                val child = RemoteViews(context.packageName, R.layout.widget_frame)
+                val child = RemoteViews(context.packageName, if (plan.tier == FramePlanner.Tier.SHARP) R.layout.widget_frame else R.layout.widget_frame_fit)
                 child.setImageViewBitmap(R.id.widget_frame_image, scaled.getValue(index))
                 views.addView(R.id.widget_flipper, child)
             }

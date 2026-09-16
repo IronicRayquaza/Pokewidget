@@ -3,9 +3,12 @@ package com.pokewidgets.app.data
 import android.content.Context
 import android.util.Log
 import com.pokewidgets.app.BuildConfig
+import com.pokewidgets.app.catalog.BattleBackground
 import com.pokewidgets.app.catalog.SpriteKey
 import com.pokewidgets.app.catalog.SpriteProvider
 import com.pokewidgets.app.catalog.SpriteSet
+import com.pokewidgets.app.catalog.Trainer
+import com.pokewidgets.app.catalog.TrainerIndex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -51,7 +54,9 @@ class SpriteSource(context: Context) {
     private val client: OkHttpClient get() = Http.files
 
     private val spriteDir = File(appContext.filesDir, "sprites").apply { mkdirs() }
-    private val cryDir = File(appContext.filesDir, "cries").apply { mkdirs() }
+    private val cries = CryCache(File(appContext.filesDir, "cries"))
+    private val trainerDir = File(appContext.filesDir, "trainers").apply { mkdirs() }
+    private val backgroundDir = File(appContext.filesDir, "backgrounds").apply { mkdirs() }
 
     // ---- Sprites ---------------------------------------------------------------
 
@@ -124,8 +129,7 @@ class SpriteSource(context: Context) {
         val urls = spriteUrls(set, spritePath(set, key, variant, part))
         return when (val fetched = download(urls)) {
             is Fetched.Ok -> {
-                runCatching { file.writeBytes(fetched.bytes) }
-                    .onFailure { Log.w(TAG, "could not cache ${file.name}", it) }
+                writeWhole(file, fetched.bytes)
                 PartFetch.Ok(fetched.bytes)
             }
             Fetched.Missing -> PartFetch.Missing
@@ -201,25 +205,18 @@ class SpriteSource(context: Context) {
      * own scope so the next tap is instant.
      */
     fun cachedCry(pokemonId: Int, legacy: Boolean): File? =
-        flavours(legacy)
-            .map { cryPath(pokemonId, it) }
-            .firstOrNull { it.isFile && it.length() > 0 }
+        flavours(legacy).firstNotNullOfOrNull { cries.cached(pokemonId, it) }
 
     /** Preference order; see [cryFile] for why the other flavour is always tried too. */
     private fun flavours(legacy: Boolean): List<String> =
         if (legacy) listOf("legacy", "latest") else listOf("latest", "legacy")
 
-    private fun cryPath(pokemonId: Int, flavour: String): File =
-        File(cryDir, "$flavour-$pokemonId.ogg")
-
     private suspend fun cry(pokemonId: Int, flavour: String): File? {
-        val file = cryPath(pokemonId, flavour)
-        if (file.isFile && file.length() > 0) return file
+        cries.cached(pokemonId, flavour)?.let { return it }
 
-        val id = "$flavour/$pokemonId"
-        // Upstream's coverage is fixed, so a miss is permanent for this install. Recording
-        // it stops a repeatedly tapped Gen 9 widget re-requesting a 404 on every tap.
-        if (id in missingCries) return null
+        // Upstream's coverage is fixed, so a miss is permanent for this install. It is kept on
+        // disk, not in memory, so a cold tap on a Gen 9 widget does not re-request a known 404.
+        if (cries.isMissing(pokemonId, flavour)) return null
 
         val bytes = download(
             listOf(
@@ -230,27 +227,76 @@ class SpriteSource(context: Context) {
         if (bytes !is Fetched.Ok) {
             // Only a confirmed absence is remembered; being offline is not evidence that
             // upstream lacks the cry.
-            if (bytes is Fetched.Missing) missingCries.add(id)
+            if (bytes is Fetched.Missing) cries.markMissing(pokemonId, flavour)
             return null
         }
-        return runCatching { file.also { it.writeBytes(bytes.bytes) } }.getOrNull()
+        return cries.write(pokemonId, flavour, bytes.bytes)
+    }
+
+    // ---- Trainers and battle backgrounds ----------------------------------------
+
+    /**
+     * A trainer's sprite, front or back, from disk or the network.
+     *
+     * Asking for a back that does not exist gives the front: the caller mirrors it and says
+     * so, rather than showing nothing. Null means "not this time" (offline or missing), and
+     * the widget then simply draws the Pokémon without its trainer.
+     */
+    suspend fun trainerBytes(index: TrainerIndex, trainer: Trainer, back: Boolean): ByteArray? {
+        val backArt = trainer.back?.takeIf { back }
+        val file = File(trainerDir, "${trainer.id}-${if (backArt != null) "back" else "front"}.png")
+        val urls = if (backArt != null) {
+            listOf(backArt.url, backArt.fallbackUrl)
+        } else {
+            listOf(index.frontUrl(trainer))
+        }
+        return cachedOrDownload(file, urls)
+    }
+
+    suspend fun backgroundBytes(background: BattleBackground): ByteArray? =
+        cachedOrDownload(
+            File(backgroundDir, "${background.id}.png"),
+            listOf(background.url, background.fallbackUrl),
+        )
+
+    /** Like sprites, these never change upstream: once on disk, always on disk. */
+    private suspend fun cachedOrDownload(file: File, urls: List<String>): ByteArray? {
+        if (file.isFile && file.length() > 0) {
+            return withContext(Dispatchers.IO) { runCatching { file.readBytes() }.getOrNull() }
+        }
+        val fetched = download(urls) as? Fetched.Ok ?: return null
+        withContext(Dispatchers.IO) { writeWhole(file, fetched.bytes) }
+        return fetched.bytes
+    }
+
+    /** Temp file then rename, so a render racing a download never reads half an image. */
+    private fun writeWhole(file: File, bytes: ByteArray) {
+        val temp = File(file.parentFile, "${file.name}.${Thread.currentThread().id}.tmp")
+        runCatching {
+            temp.writeBytes(bytes)
+            if (!temp.renameTo(file)) temp.delete()
+        }.onFailure {
+            temp.delete()
+            Log.w(TAG, "could not cache ${file.name}", it)
+        }
     }
 
     // ---- Cache management ------------------------------------------------------
 
     fun cacheSizeBytes(): Long =
-        sequenceOf(spriteDir, cryDir)
+        sequenceOf(spriteDir, trainerDir, backgroundDir)
             .flatMap { it.walkTopDown() }
             .filter { it.isFile }
-            .sumOf { it.length() }
+            .sumOf { it.length() } + cries.sizeBytes()
 
     fun clearCache() {
         spriteDir.listFiles()?.forEach { it.delete() }
-        cryDir.listFiles()?.forEach { it.delete() }
+        trainerDir.listFiles()?.forEach { it.delete() }
+        backgroundDir.listFiles()?.forEach { it.delete() }
         // Clearing the cache should mean *everything*, including what we learned upstream
         // does not have — otherwise a re-pinned SHA could never be re-probed.
+        cries.clear()
         missingSprites.clear()
-        missingCries.clear()
     }
 
     // ---- Transport -------------------------------------------------------------
@@ -306,15 +352,12 @@ class SpriteSource(context: Context) {
         val SPRITE_EXTS = listOf("gif", "png")
 
         /**
-         * `"<flavour>/<id>"` pairs upstream has confirmed it does not have.
+         * Sprite URLs upstream has answered 404 for.
          *
          * Static, not per-instance: `SpriteSource` is constructed freshly by the widget
          * provider on every tap, so an instance field would forget the miss immediately
-         * and re-request it each time.
+         * and re-request it each time. (Cry misses are kept on disk; see [CryCache].)
          */
-        val missingCries: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
-
-        /** Sprite URLs upstream has answered 404 for. Same reasoning as [missingCries]. */
         val missingSprites: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
     }
 }

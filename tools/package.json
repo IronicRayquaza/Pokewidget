@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Build-time generator for the PokeWidget sprite catalog. Requires Node 18+ (global fetch). No dependencies.",
+  "description": "Build-time generators for the PokeWidget catalogs: sprites, trainers and battle backgrounds. Requires Node 18+ (global fetch). No dependencies.",
   "scripts": {
     "catalog": "node build-catalog.mjs",
-    "catalog:fresh": "node build-catalog.mjs --no-cache"
+    "catalog:fresh": "node build-catalog.mjs --no-cache",
+    "trainers": "node build-trainers.mjs"
   }
 }
