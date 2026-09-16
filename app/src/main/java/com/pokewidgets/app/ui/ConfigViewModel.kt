@@ -180,8 +180,9 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * One tap from a plain widget to the start of a battle: the trainer from behind, the
-     * Pokémon from behind, and the matching generation's battlefield behind them both.
+     * One tap from a plain widget to the start of a battle: the trainer from behind in the
+     * foreground, the Pokémon facing them from the far platform, and the matching generation's
+     * battlefield behind them both.
      *
      * Only ever run because the user pressed the button; nothing else in the app turns
      * any of these on.
@@ -191,21 +192,16 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
         val set = current.selectedSet ?: return
         val c = current.config
         val trainer = current.trainers?.trainer(c.trainerId) ?: current.trainers?.defaultFor(set.gen)
-        val canBack = set.covers(c.pokemonId, true, c.shiny, c.female, c.style)
         update {
             it.copy(
                 scene = Scene.BATTLE,
                 trainerId = trainer?.id ?: it.trainerId,
                 trainerPose = TrainerPose.BACK,
-                back = canBack || it.back,
+                // The Pokémon is the one being faced, so it shows its front.
+                back = false,
                 showBackground = true,
                 backgroundId = it.backgroundId ?: current.backgrounds?.defaultFor(set.gen)?.id,
             )
-        }
-        if (!canBack) {
-            _state.update {
-                it.copy(notice = "${set.label} has no back sprite of this Pokémon, so it faces you instead.")
-            }
         }
     }
 

@@ -85,7 +85,6 @@ import com.pokewidgets.app.ui.components.pressScale
 import com.pokewidgets.app.ui.theme.Chalk
 import com.pokewidgets.app.ui.theme.Ink
 import com.pokewidgets.app.widget.SceneLayout
-import com.pokewidgets.app.widget.sceneryBox
 import kotlin.math.roundToInt
 import com.pokewidgets.app.ui.theme.Lime
 import com.pokewidgets.app.ui.theme.PokeRed
@@ -217,13 +216,14 @@ private fun PreviewPanel(state: ConfigUiState) {
                     },
                 ),
         ) {
-            if (background != null) {
-                BattleBackgroundImage(background, Modifier.fillMaxSize())
-            }
-
             val w = maxWidth.value.roundToInt()
             val h = maxHeight.value.roundToInt()
-            val layout = SceneLayout.layout(scene, config.trainerSide, w, h)
+            val mirrorScene = scene == Scene.BATTLE && config.trainerSide == TrainerSide.RIGHT
+            if (background != null) {
+                BattleBackgroundImage(background, Modifier.fillMaxSize(), mirrored = mirrorScene)
+            }
+            val stage = background?.let { SceneLayout.battleFrame(it, w, h).second } ?: SceneLayout.OPEN_STAGE
+            val layout = SceneLayout.layout(scene, config.trainerSide, w, h, stage)
             val align = if (layout.anchorBottom) Alignment.BottomCenter else Alignment.Center
 
             @Composable
@@ -359,18 +359,26 @@ private fun SetRow(state: ConfigUiState, onPick: () -> Unit) {
                 color = Ink,
             )
             Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Caption(set?.hardware ?: "—")
-                if (set?.animated == true) {
-                    Spacer(Modifier.width(8.dp))
+            Caption(set?.hardware ?: "—")
+            // Its own line: squeezed in beside a long hardware name like "Game Boy Advance",
+            // "animated" used to break mid-word.
+            if (set?.animated == true) {
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Icon(
                         Icons.Default.PlayArrow,
-                        contentDescription = "Animated",
+                        contentDescription = null,
                         tint = PokeRed,
                         modifier = Modifier.size(12.dp),
                     )
                     Spacer(Modifier.width(3.dp))
-                    Caption("animated", color = PokeRed)
+                    Text(
+                        "Animated",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = PokeRed,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
             }
         }
@@ -906,14 +914,15 @@ private fun <T> OptionRow(
  * widget crops it. Showdown's Gen 3 and 4 images carry a whole battle screen around the field.
  */
 @Composable
-private fun BattleBackgroundImage(background: BattleBackground, modifier: Modifier) {
-    val scenery = background.sceneryBox()
-    BoxWithConstraints(modifier.clipToBounds()) {
+private fun BattleBackgroundImage(background: BattleBackground, modifier: Modifier, mirrored: Boolean = false) {
+    BoxWithConstraints(modifier.clipToBounds().graphicsLayer { scaleX = if (mirrored) -1f else 1f }) {
         val boxW = maxWidth.value
         val boxH = maxHeight.value
-        val scale = maxOf(boxW / scenery.width, boxH / scenery.height)
-        val dx = -scenery.left * scale - (scenery.width * scale - boxW) / 2
-        val dy = -scenery.top * scale - (scenery.height * scale - boxH) / 2
+        // The same crop the widget uses, so platforms line up with where figures stand.
+        val (crop, _) = SceneLayout.battleFrame(background, boxW.roundToInt().coerceAtLeast(1), boxH.roundToInt().coerceAtLeast(1))
+        val scale = maxOf(boxW / crop.width, boxH / crop.height)
+        val dx = -crop.left * scale - (crop.width * scale - boxW) / 2
+        val dy = -crop.top * scale - (crop.height * scale - boxH) / 2
         AsyncImage(
             model = background.url,
             contentDescription = null,

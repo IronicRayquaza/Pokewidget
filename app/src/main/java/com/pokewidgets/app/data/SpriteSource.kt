@@ -58,6 +58,10 @@ class SpriteSource(context: Context) {
     private val trainerDir = File(appContext.filesDir, "trainers").apply { mkdirs() }
     private val backgroundDir = File(appContext.filesDir, "backgrounds").apply { mkdirs() }
 
+    init {
+        forgetWhiteCardSprites(spriteDir)
+    }
+
     // ---- Sprites ---------------------------------------------------------------
 
     /**
@@ -347,6 +351,34 @@ class SpriteSource(context: Context) {
 
     private companion object {
         const val TAG = "SpriteSource"
+
+        /**
+         * Up to 1.4 the Game Boy still sets were fetched with their white card, and cached
+         * forever under the same name the transparent copy now uses. Those files are dropped
+         * once, so widgets that already had them fetch the clean version. A marker file makes
+         * this a one-off rather than a scan on every construction.
+         */
+        private val WHITE_CARD_SETS = listOf(
+            "versions_generation_i_red_blue-",
+            "versions_generation_i_yellow-",
+            "versions_generation_ii_gold-",
+            "versions_generation_ii_silver-",
+            "versions_generation_ii_crystal-",
+        )
+
+        @Volatile private var whiteCardsForgotten = false
+
+        @Synchronized
+        fun forgetWhiteCardSprites(spriteDir: File) {
+            if (whiteCardsForgotten) return
+            whiteCardsForgotten = true
+            val marker = File(spriteDir, ".transparent-gameboy-v1")
+            if (marker.exists()) return
+            spriteDir.listFiles()
+                ?.filter { f -> WHITE_CARD_SETS.any { f.name.startsWith(it) } }
+                ?.forEach { it.delete() }
+            runCatching { marker.createNewFile() }
+        }
 
         /** Every extension any set uses; see `SpriteSet.ext`. */
         val SPRITE_EXTS = listOf("gif", "png")

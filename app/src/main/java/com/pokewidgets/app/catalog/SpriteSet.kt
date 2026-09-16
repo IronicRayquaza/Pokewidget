@@ -89,6 +89,13 @@ data class SpriteSet(
         return pokemonId in idsFor(path)
     }
 
+    /**
+     * True for the Game Boy sets whose plain stills sit on a white card and which also carry a
+     * transparent copy. See [resolveVariant]; the widget also clears the white itself for the
+     * few combinations with no transparent copy (Gold and Silver shinies).
+     */
+    val prefersTransparent: Boolean get() = !animated && variants.containsKey(TRANSPARENT)
+
     /** Whether this set has any shiny art at all — Red/Blue and Scarlet/Violet do not. */
     val hasShinies: Boolean get() = variants.keys.any { "shiny" in it.split('/') }
 
@@ -123,6 +130,14 @@ data class SpriteSet(
         female: Boolean,
         style: String?,
     ): ResolvedVariant? {
+        // Red/Blue, Yellow and Gold/Silver/Crystal ship their stills on an opaque white card,
+        // which sits on a home screen as a white box. The same art without the card is
+        // upstream as `transparent`, so it is what "no particular style" means for them.
+        if (style == null && prefersTransparent) {
+            variantPath(back, shiny, female, TRANSPARENT)
+                ?.takeIf { pokemonId in idsFor(it) }
+                ?.let { return ResolvedVariant(it, exact = true) }
+        }
         var b = back
         var s = shiny
         var f = female
@@ -190,6 +205,9 @@ data class SpriteSet(
  * is the variant that was asked for or the nearest one this set actually has.
  */
 data class ResolvedVariant(val path: String, val exact: Boolean)
+
+/** Upstream's name for a still with its white card removed. Top level, not in a companion: see TrainerCatalog.kt. */
+private const val TRANSPARENT = "transparent"
 
 @Serializable
 data class SpriteSetIndex(

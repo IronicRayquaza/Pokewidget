@@ -125,4 +125,17 @@ class SpriteSetResolveTest {
             }
         }
     }
+
+    @Test
+    fun `Game Boy stills come without their white card when a clean copy exists`() {
+        val redBlue = set("versions_generation_i_red_blue")
+        assertEquals("transparent", redBlue.resolveVariant(1, back = false, shiny = false, female = false, style = null)?.path)
+        assertEquals("transparent/back", redBlue.resolveVariant(1, back = true, shiny = false, female = false, style = null)?.path)
+        // A style someone picked on purpose is left alone.
+        assertEquals("gray", redBlue.resolveVariant(1, back = false, shiny = false, female = false, style = "gray")?.path)
+        // Gold has no transparent shiny: the shiny still wins, and the widget clears the card.
+        assertEquals("shiny", set("versions_generation_ii_gold").resolveVariant(1, back = false, shiny = true, female = false, style = null)?.path)
+        // Sets that were never on a white card are untouched.
+        assertEquals("", showdown.resolveVariant(1, back = false, shiny = false, female = false, style = null)?.path)
+    }
 }

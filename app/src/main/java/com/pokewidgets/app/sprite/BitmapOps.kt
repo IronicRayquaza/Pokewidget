@@ -199,6 +199,23 @@ object BitmapOps {
     }
 
     /**
+     * A copy with the white card around a Game Boy still made transparent, or [source]
+     * itself when it has none. Only white reachable from the edges is cleared, so the whites
+     * of the eyes survive. Recycles [source] when it returns a copy.
+     */
+    fun withoutWhiteCard(source: Bitmap): Bitmap {
+        val w = source.width
+        val h = source.height
+        if (w == 0 || h == 0 || source.getPixel(0, 0) != Color.WHITE) return source
+        val pixels = IntArray(w * h)
+        source.getPixels(pixels, 0, w, 0, 0, w, h)
+        TrainerArt.clearEdgeBackground(pixels, w, h, Color.WHITE)
+        val out = Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888)
+        source.recycle()
+        return out
+    }
+
+    /**
      * A horizontally mirrored copy, so the sprite faces the other way. Recycles [source].
      *
      * Done to the bitmap rather than the view: `View.setScaleX` only became callable through

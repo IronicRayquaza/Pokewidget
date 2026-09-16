@@ -136,7 +136,7 @@ async function main() {
 
   console.log('==> battle backgrounds');
   const backgrounds = [];
-  for (const [id, label, gen, crop] of BACKGROUNDS) {
+  for (const [id, label, gen, crop, stage] of BACKGROUNDS) {
     const file = `play.pokemonshowdown.com/fx/bg-${id}.png`;
     const url = `https://cdn.jsdelivr.net/gh/smogon/pokemon-showdown-client@${SHOWDOWN_CLIENT_SHA}/${file}`;
     const { w, h } = pngSize(await get(url));
@@ -149,6 +149,7 @@ async function main() {
       w,
       h,
       ...(crop ? { crop } : {}),
+      ...(stage ? { foe: stage.foe, player: stage.player } : {}),
     });
     console.log(`     ${id.padEnd(16)} ${w}x${h}`);
   }

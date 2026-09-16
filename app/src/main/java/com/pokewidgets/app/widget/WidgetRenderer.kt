@@ -18,6 +18,7 @@ import com.pokewidgets.app.catalog.SpriteSet
 import com.pokewidgets.app.data.Scene
 import com.pokewidgets.app.data.SpriteFetch
 import com.pokewidgets.app.data.TrainerPose
+import com.pokewidgets.app.data.TrainerSide
 import com.pokewidgets.app.data.Fill
 import com.pokewidgets.app.data.WeatherSource
 import com.pokewidgets.app.data.SpriteSource
@@ -190,6 +191,15 @@ class WidgetRenderer(private val context: Context) {
         }
 
         val decoded = GifFrames.decode(parts, isGif = set.ext == "gif", delaysMs = set.frameDelaysMs)
+            ?.let { sprite ->
+                // A few Game Boy stills have no transparent copy upstream (Gold and Silver
+                // shinies); clear their white card here rather than draw a white box.
+                if (set.prefersTransparent) {
+                    DecodedSprite(sprite.frames.map(BitmapOps::withoutWhiteCard), sprite.delaysMs)
+                } else {
+                    sprite
+                }
+            }
             ?: return statusViews(widgetId, config, "Couldn't decode sprite")
 
         val layers = loadLayers(config)
@@ -207,8 +217,8 @@ class WidgetRenderer(private val context: Context) {
         /** Draw the trainer mirrored — asked for, or standing in for a missing back sprite. */
         val trainerMirrored: Boolean,
         val background: Bitmap?,
-        /** The part of [background] that is scenery; see `BattleBackground.crop`. */
-        val backgroundScenery: SceneLayout.Box?,
+        /** What [background] is — its scenery and where its platforms are. */
+        val backgroundEntry: com.pokewidgets.app.catalog.BattleBackground?,
     ) {
         fun recycle() {
             trainer?.takeIf { !it.isRecycled }?.recycle()
@@ -242,7 +252,7 @@ class WidgetRenderer(private val context: Context) {
                 val entry = catalog.backgrounds().background(id) ?: return@runCatching null
                 val bytes = source.backgroundBytes(entry) ?: return@runCatching null
                 android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    ?.let { it to entry.sceneryBox() }
+                    ?.let { it to entry }
             }.onFailure { Log.w(TAG, "could not load background $id", it) }.getOrNull()
         }
         return Layers(trainer?.first, trainer?.second ?: false, background?.first, background?.second)
@@ -269,20 +279,28 @@ class WidgetRenderer(private val context: Context) {
         val views = RemoteViews(context.packageName, R.layout.widget_root)
         val radiusPx = config.cornerRadiusDp * metrics.density
 
+        // A trainer that could not be loaded leaves the widget as a plain Pokémon widget.
+        val scene = if (layers.trainer == null) Scene.SOLO else config.effectiveScene
+        var stage = SceneLayout.OPEN_STAGE
+
         // Background first, so everything else composites over it.
         val battleBackground = layers.background
-        if (battleBackground != null) {
+        val backgroundEntry = layers.backgroundEntry
+        if (battleBackground != null && backgroundEntry != null) {
             val (plateW, plateH) = SceneLayout.plateSize(boxW, boxH, minOf(MAX_BACKGROUND_BYTES, budget / 4))
-            val scenery = layers.backgroundScenery ?: SceneLayout.Box(0, 0, battleBackground.width, battleBackground.height)
-            val crop = SceneLayout.coverCrop(scenery.width, scenery.height, boxW, boxH)
-                .let { it.copy(left = it.left + scenery.left, top = it.top + scenery.top) }
+            val (crop, framed) = SceneLayout.battleFrame(backgroundEntry, boxW, boxH)
+            stage = framed
             val plate = BitmapOps.battlePlate(
                 battleBackground,
                 android.graphics.Rect(crop.left, crop.top, crop.right, crop.bottom),
                 plateW,
                 plateH,
                 radiusPx * plateW / boxW,
-            )
+            ).let {
+                // A trainer on the right turns the whole scene round, platforms included, so
+                // the Pokémon still stands on one.
+                if (scene == Scene.BATTLE && config.trainerSide == TrainerSide.RIGHT) BitmapOps.mirrored(it) else it
+            }
             views.setImageViewBitmap(R.id.widget_background, plate)
             views.setViewVisibility(R.id.widget_background, View.VISIBLE)
             spriteBudget -= plate.byteCount
@@ -298,10 +316,12 @@ class WidgetRenderer(private val context: Context) {
         views.setViewVisibility(R.id.widget_status, View.GONE)
         views.setViewVisibility(R.id.widget_flipper, View.VISIBLE)
         views.removeAllViews(R.id.widget_flipper)
+        // Launchers re-apply an update onto the views they already have, so anything a
+        // previous layout changed has to be put back explicitly. Without this a trainer moved
+        // from behind the Pokémon to in front of it was drawn twice, once in each place.
+        resetScene(views)
 
-        // A trainer that could not be loaded leaves the widget as a plain Pokémon widget.
-        val scene = if (layers.trainer == null) Scene.SOLO else config.effectiveScene
-        val layout = SceneLayout.layout(scene, config.trainerSide, boxW, boxH)
+        val layout = SceneLayout.layout(scene, config.trainerSide, boxW, boxH, stage)
         val trainerBox = layout.trainer
         if (trainerBox != null && layers.trainer != null) {
             spriteBudget -= addTrainer(views, layers, layout, trainerBox, boxW, boxH, budget / 5)
@@ -333,6 +353,12 @@ class WidgetRenderer(private val context: Context) {
 
         views.setOnClickPendingIntent(R.id.widget_root, tapIntent(widgetId, config))
         return views
+    }
+
+    private fun resetScene(views: RemoteViews) {
+        views.setViewVisibility(R.id.widget_trainer_back, View.GONE)
+        views.setViewVisibility(R.id.widget_trainer_front, View.GONE)
+        views.setViewPadding(R.id.widget_flipper, 0, 0, 0, 0)
     }
 
     /**
@@ -569,6 +595,7 @@ class WidgetRenderer(private val context: Context) {
         val views = RemoteViews(context.packageName, R.layout.widget_root)
         views.removeAllViews(R.id.widget_flipper)
         views.setViewVisibility(R.id.widget_flipper, View.GONE)
+        resetScene(views)
         views.setViewVisibility(R.id.widget_background, View.GONE)
         views.setViewVisibility(R.id.widget_status, View.VISIBLE)
         views.setTextViewText(R.id.widget_status, message)

@@ -111,6 +111,10 @@ data class BattleBackground(
      * actual field; only the field belongs behind a widget. Null means the whole image.
      */
     val crop: List<Int>? = null,
+    /** Where the Pokémon stands — the far platform — as `[x, y]` fractions of the scenery. */
+    val foe: List<Double>? = null,
+    /** Where the trainer stands — the near platform — as `[x, y]` fractions of the scenery. */
+    val player: List<Double>? = null,
 ) {
     /** "Gen 3 · Cave" — backgrounds repeat labels across generations. */
     val displayName: String get() = if (gen <= 4) "Gen $gen · $label" else label

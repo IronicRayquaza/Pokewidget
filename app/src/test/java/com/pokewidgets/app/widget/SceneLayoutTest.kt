@@ -58,14 +58,37 @@ class SceneLayoutTest {
     }
 
     @Test
-    fun `battle puts the trainer in front, low and to one side`() {
-        val left = SceneLayout.layout(Scene.BATTLE, TrainerSide.LEFT, 400, 300)
-        val right = SceneLayout.layout(Scene.BATTLE, TrainerSide.RIGHT, 400, 300)
-        assertTrue(left.trainerInFront)
-        assertEquals(300, left.trainer!!.bottom)
-        assertEquals(0, left.trainer!!.left)
-        assertEquals(400, right.trainer!!.right)
+    fun `battle puts the trainer in front at the bottom, and the Pokemon on its platform`() {
+        val stage = SceneLayout.Stage(foe = SceneLayout.Point(0.75, 0.53), player = SceneLayout.Point(0.25, 1.0))
+        for ((w, h) in listOf(400 to 300, 1000 to 250, 480 to 800)) {
+            val layout = SceneLayout.layout(Scene.BATTLE, TrainerSide.LEFT, w, h, stage)
+            val trainer = layout.trainer!!
+            val pokemon = layout.pokemon
+            assertTrue(layout.trainerInFront)
+            assertEquals("trainer stands on the bottom edge ($w x $h)", h, trainer.bottom)
+            // Feet just below the platform centre, and centred over it.
+            assertEquals("pokemon centred on the platform ($w x $h)", 0.75 * w, pokemon.left + pokemon.width / 2.0, 2.0)
+            assertTrue("pokemon stands on the platform ($w x $h)", pokemon.bottom in (0.53 * h).toInt()..(0.65 * h).toInt())
+            assertTrue("inside the widget", pokemon.left >= 0 && pokemon.right <= w && pokemon.top >= 0)
+            assertTrue(trainer.left >= 0 && trainer.right <= w)
+        }
+        val right = SceneLayout.layout(Scene.BATTLE, TrainerSide.RIGHT, 400, 300, stage)
+        val left = SceneLayout.layout(Scene.BATTLE, TrainerSide.LEFT, 400, 300, stage)
         assertEquals("mirror images", 400 - left.pokemon.right, right.pokemon.left)
+    }
+
+    @Test
+    fun `the far platform stays in view however the widget is shaped`() {
+        val gen4 = com.pokewidgets.app.catalog.BattleBackground(
+            id = "gen4", label = "Diamond & Pearl", gen = 4, url = "", fallbackUrl = "", w = 753, h = 500,
+            crop = listOf(156, 96, 428, 284), foe = listOf(0.757, 0.532), player = listOf(0.243, 1.0),
+        )
+        for ((w, h) in listOf(1000 to 250, 400 to 400, 480 to 800, 300 to 900)) {
+            val (crop, stage) = SceneLayout.battleFrame(gen4, w, h)
+            assertTrue("crop inside the scenery ($w x $h)", crop.left >= 156 && crop.right <= 156 + 428 && crop.top >= 96 && crop.bottom <= 96 + 284)
+            assertTrue("platform visible horizontally ($w x $h): ${stage.foe.x}", stage.foe.x in 0.3..0.92)
+            assertTrue("platform visible vertically ($w x $h): ${stage.foe.y}", stage.foe.y in 0.2..0.9)
+        }
     }
 
     @Test

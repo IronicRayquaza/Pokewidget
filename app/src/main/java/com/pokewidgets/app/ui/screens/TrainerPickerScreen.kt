@@ -45,6 +45,7 @@ import com.pokewidgets.app.ui.components.SpriteImage
 import com.pokewidgets.app.ui.components.SpriteStage
 import com.pokewidgets.app.ui.components.pressScale
 import com.pokewidgets.app.ui.theme.Ink
+import com.pokewidgets.app.ui.theme.InkSoft
 import com.pokewidgets.app.ui.theme.Lime
 import com.pokewidgets.app.ui.theme.PokeRed
 import com.pokewidgets.app.ui.theme.Sky
@@ -194,9 +195,16 @@ private fun TrainerCell(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Caption(
+        // Always exactly two lines, so every card in the grid is the same height whatever the
+        // game is called — "Let's Go" and "FireRed, LeafGreen & Emerald" sit side by side.
+        Text(
             trainer.variant ?: roleLabel,
-            Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodySmall,
+            color = InkSoft,
+            minLines = 2,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

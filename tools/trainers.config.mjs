@@ -325,34 +325,43 @@ export const SHOWDOWN_CLIENT_SHA = 'f2faebd6892b314d785a0038f77309afed36970c';
  */
 const FRAMED = [156, 96, 428, 284];
 
+/**
+ * Where figures stand, as fractions of the scenery: the foe's platform (where the Pokémon
+ * goes) and the player's (where the trainer goes, at the bottom edge). Measured on the Gen 3
+ * and Gen 4 images, whose far platform is centred at (480, 247) px; the newer backgrounds
+ * have no platforms, so figures stand on the ground at the same general spots.
+ */
+const FRAMED_STAGE = { foe: [0.757, 0.532], player: [0.243, 1] };
+const OPEN_STAGE = { foe: [0.72, 0.6], player: [0.25, 1] };
+
 // Gen 1 and Gen 2 are left out: their "backgrounds" are an empty white battle box.
 export const BACKGROUNDS = [
-  ['gen3', 'Ruby & Sapphire', 3, FRAMED],
-  ['gen3-arena', 'Battle Arena', 3, FRAMED],
-  ['gen3-cave', 'Cave', 3, FRAMED],
-  ['gen3-forest', 'Forest', 3, FRAMED],
-  ['gen3-ocean', 'Ocean', 3, FRAMED],
-  ['gen3-sand', 'Desert', 3, FRAMED],
-  ['gen4', 'Diamond & Pearl', 4, FRAMED],
-  ['gen4-cave', 'Cave', 4, FRAMED],
-  ['gen4-indoors', 'Indoors', 4, FRAMED],
-  ['gen4-snow', 'Snow', 4, FRAMED],
-  ['gen4-water', 'Water', 4, FRAMED],
-  ['route', 'Route', 5],
-  ['meadow', 'Meadow', 5],
-  ['forest', 'Forest', 5],
-  ['city', 'City', 5],
-  ['river', 'River', 5],
-  ['beach', 'Beach', 5],
-  ['beachshore', 'Shoreline', 5],
-  ['desert', 'Desert', 5],
-  ['mountain', 'Mountain', 5],
-  ['thunderplains', 'Thunder Plains', 5],
-  ['deepsea', 'Deep Sea', 5],
-  ['dampcave', 'Damp Cave', 5],
-  ['earthycave', 'Earthy Cave', 5],
-  ['icecave', 'Ice Cave', 5],
-  ['volcanocave', 'Volcano Cave', 5],
+  ['gen3', 'Ruby & Sapphire', 3, FRAMED, FRAMED_STAGE],
+  ['gen3-arena', 'Battle Arena', 3, FRAMED, FRAMED_STAGE],
+  ['gen3-cave', 'Cave', 3, FRAMED, FRAMED_STAGE],
+  ['gen3-forest', 'Forest', 3, FRAMED, FRAMED_STAGE],
+  ['gen3-ocean', 'Ocean', 3, FRAMED, FRAMED_STAGE],
+  ['gen3-sand', 'Desert', 3, FRAMED, FRAMED_STAGE],
+  ['gen4', 'Diamond & Pearl', 4, FRAMED, FRAMED_STAGE],
+  ['gen4-cave', 'Cave', 4, FRAMED, FRAMED_STAGE],
+  ['gen4-indoors', 'Indoors', 4, FRAMED, FRAMED_STAGE],
+  ['gen4-snow', 'Snow', 4, FRAMED, FRAMED_STAGE],
+  ['gen4-water', 'Water', 4, FRAMED, FRAMED_STAGE],
+  ['route', 'Route', 5, null, OPEN_STAGE],
+  ['meadow', 'Meadow', 5, null, OPEN_STAGE],
+  ['forest', 'Forest', 5, null, OPEN_STAGE],
+  ['city', 'City', 5, null, OPEN_STAGE],
+  ['river', 'River', 5, null, OPEN_STAGE],
+  ['beach', 'Beach', 5, null, OPEN_STAGE],
+  ['beachshore', 'Shoreline', 5, null, OPEN_STAGE],
+  ['desert', 'Desert', 5, null, OPEN_STAGE],
+  ['mountain', 'Mountain', 5, null, OPEN_STAGE],
+  ['thunderplains', 'Thunder Plains', 5, null, OPEN_STAGE],
+  ['deepsea', 'Deep Sea', 5, null, OPEN_STAGE],
+  ['dampcave', 'Damp Cave', 5, null, OPEN_STAGE],
+  ['earthycave', 'Earthy Cave', 5, null, OPEN_STAGE],
+  ['icecave', 'Ice Cave', 5, null, OPEN_STAGE],
+  ['volcanocave', 'Volcano Cave', 5, null, OPEN_STAGE],
 ];
 
 export { gen };
