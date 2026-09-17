@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PokéWidget</title>
+    <!--
+      The widget on its own: no chrome, no page background. A Tauri window loads this, and so
+      does the browser when a widget is opened in its own tab or window.
+    -->
+  </head>
+  <body class="bare">
+    <div id="widget"></div>
+    <script type="module" src="/src/widget.tsx"></script>
+  </body>
+</html>

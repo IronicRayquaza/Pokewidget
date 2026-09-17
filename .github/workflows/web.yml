@@ -1,0 +1,31 @@
+# The desktop and browser app's tests and build. The Android app has no CI yet; this one is
+# cheap to run and catches a broken port of the shared rules before it reaches the site.
+name: web
+
+on:
+  push:
+    paths: ['web/**', 'app/src/main/assets/**', '.github/workflows/web.yml']
+  pull_request:
+    paths: ['web/**', 'app/src/main/assets/**']
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      # docs/app is committed, so the site is whatever was last built and pushed. A build
+      # that changes it means someone forgot to run it.
+      - name: Check the committed site is up to date
+        run: git diff --exit-code -- ../docs/app || (echo "::error::docs/app is stale — run 'npm run build' in web/ and commit the result" && exit 1)

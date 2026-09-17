@@ -43,6 +43,10 @@ release — nearly everything below came from you.
 None of this changes a widget you have already placed, or a new one you don't customise:
 trainers, backgrounds and mirroring are all off until you turn them on.
 
+**Also new: PokéWidget on computers.** The same widgets now run in a browser and as a
+desktop app, built from one shared set of rules and the very same Pokémon data. It is a
+separate download and is not part of this Android release.
+
 Trainer sprites and battle backgrounds come from [Pokémon Showdown](https://play.pokemonshowdown.com);
 trainers seen from behind come from the [pret](https://github.com/pret) game decompilations.
 

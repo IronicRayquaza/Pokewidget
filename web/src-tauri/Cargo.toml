@@ -1,0 +1,20 @@
+[package]
+name = "pokewidget"
+version = "1.5.0"
+description = "Animated Pokemon sprites on your desktop"
+authors = ["IronicRayquaza"]
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# macos-private-api pairs with `macOSPrivateApi` in tauri.conf.json: it is what allows a
+# transparent window on macOS.
+tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
+tauri-plugin-window-state = "2"
+
+[features]
+# Kept from the Tauri template: the CLI passes this through when building for production.
+custom-protocol = ["tauri/custom-protocol"]

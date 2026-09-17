@@ -1,0 +1,11 @@
+{
+  "name": "PokéWidget",
+  "short_name": "PokéWidget",
+  "description": "Animated Pokémon sprites on your desktop and in your browser.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FDF6E8",
+  "theme_color": "#FDF6E8",
+  "icons": []
+}

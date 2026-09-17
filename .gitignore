@@ -23,3 +23,13 @@ pid*.log
 keystore.properties
 *.jks
 *.keystore
+
+# Built APKs handed to testers. Binaries do not belong in git history.
+dist/
+
+# The desktop app's Rust build output and its generated frontend bundle inputs.
+web/src-tauri/target/
+web/src-tauri/gen/
+
+# Copied out of the Android app by web/scripts/sync-data.mjs before every dev run and build.
+web/public/data/

@@ -26,6 +26,15 @@ normal:
 A sideloaded app cannot update itself, so new versions are announced in
 **[the Discord](https://discord.gg/QFuHPZJRqM)**, along with install help and somewhere to report what breaks.
 
+## On desktops and in browsers
+
+The same widgets run outside Android: **[open the web version](https://ironicrayquaza.github.io/Pokewidget/app/)**,
+or build the desktop app, whose windows are frameless, transparent and always on top.
+
+The code is in [`web/`](web/README.md) — one TypeScript app, packaged with Tauri for the
+desktop. It reads the very same generated catalogs the Android app ships, and the rules that
+decide what to draw are ports of the Kotlin, tested against those catalogs.
+
 ## Not affiliated with anyone
 
 Pokémon and all related art are trademarks of Nintendo, Creatures Inc. and GAME FREAK inc. This
