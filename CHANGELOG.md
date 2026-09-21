@@ -35,6 +35,14 @@ release — nearly everything below came from you.
   around, and the app says so.
 - **Battle backgrounds.** A library of battlefields from the games, as an alternative to a
   plain colour behind the sprite.
+- **Scenery.** Somewhere for your Pokémon to actually stand: plains, forest, beach, cave,
+  volcano, open sea, a back alley, space, and thirty or so more. Unlike a battlefield, there
+  is no platform painted in, so a Pokémon of any size stands on the ground rather than
+  hovering over a stage built for something else. Seven of them — Sunny Day, Sunset, Starry
+  Night, Snowfield, Seaside, Autumn and Blossom — are **drawn by the app itself** and need
+  nothing downloaded, so there is always something to pick even on a fresh install with no
+  connection. Battlefields are now only offered for battle scenes, which is the only place
+  they ever looked right.
 - **Shiny is easy to find.** The Shiny switch now sits right under the preview and is always
   there. If a sprite set has no shiny of your Pokémon, tapping it tells you why instead of the
   option silently disappearing. The Pokémon page has a Shiny switch too, and "Add to home
@@ -48,7 +56,9 @@ desktop app, built from one shared set of rules and the very same Pokémon data.
 separate download and is not part of this Android release.
 
 Trainer sprites and battle backgrounds come from [Pokémon Showdown](https://play.pokemonshowdown.com);
-trainers seen from behind come from the [pret](https://github.com/pret) game decompilations.
+trainers seen from behind come from the [pret](https://github.com/pret) game decompilations;
+scenery comes from [PokéRogue](https://github.com/pagefaultgames/pokerogue-assets), whose art is
+CC-BY-NC-SA 4.0 — credited here, and never sold.
 
 ## 1.4
 

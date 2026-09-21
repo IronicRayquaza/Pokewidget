@@ -184,8 +184,8 @@ both `legacy` (the harsher Game Boy-era cry) and `latest` flavours.
 
 ### Trainers and battle backgrounds
 
-Pairing a trainer, and the battle backgrounds, are optional extras: a widget only gets
-either because someone chose them.
+Pairing a trainer, and the backgrounds, are optional extras: a widget only gets any of them
+because someone chose them.
 
 - **Trainer fronts** are every sprite in Pokémon Showdown's `sprites/trainers/` folder — about
   1,500, sorted by region and role using the table in
@@ -201,7 +201,18 @@ either because someone chose them.
 - **Battle backgrounds** are Showdown's, from
   [`smogon/pokemon-showdown-client`](https://github.com/smogon/pokemon-showdown-client) pinned
   to one commit. The Gen 3 and Gen 4 ones are drawn as a whole battle screen, so only the field
-  inside is used.
+  inside is used. Each carries the coordinates of its two platforms, which is how a battle
+  scene lands its Pokémon on the far one.
+- **Scenery** is [PokéRogue](https://github.com/pagefaultgames/pokerogue-assets)'s biome
+  backdrops, pinned to one commit (`pokerogueSha` in `backgrounds.json`). PokéRogue keeps its
+  platforms in separate images and those are deliberately not used: scenery has no platform, so
+  a Pokémon of any size stands on the ground line instead. The art is **CC-BY-NC-SA 4.0** —
+  credit it, and never sell it.
+- **Drawn scenery** is the exception to all of the above: seven backdrops
+  ([`DrawnScenery.kt`](app/src/main/java/com/pokewidgets/app/sprite/DrawnScenery.kt)) that the
+  app paints itself at 320×180, straight into an `IntArray` with no anti-aliasing and no
+  network. Fixed seeds make them deterministic, so the preview is pixel-identical to the home
+  screen, and they are the only backgrounds that work on a fresh install with no connection.
 
 ```bash
 node tools/build-trainers.mjs   # writes trainers.json and backgrounds.json into app/src/main/assets/
