@@ -92,6 +92,29 @@ class SceneLayoutTest {
     }
 
     @Test
+    fun `on scenery a Pokemon stands on the ground`() {
+        for ((w, h) in listOf(400 to 300, 1000 to 250, 480 to 800)) {
+            val solo = SceneLayout.layout(Scene.SOLO, TrainerSide.LEFT, w, h, onScenery = true)
+            assertTrue(solo.anchorBottom)
+            assertEquals((h * SceneLayout.GROUND).toInt().toDouble(), solo.pokemon.bottom.toDouble(), 1.0)
+            val pair = SceneLayout.layout(Scene.SIDE_BY_SIDE, TrainerSide.LEFT, w, h, onScenery = true)
+            assertEquals("both on the same ground", pair.pokemon.bottom, pair.trainer!!.bottom)
+        }
+        // Without scenery nothing moves: the default widget is untouched.
+        assertEquals(SceneLayout.Box(0, 0, 400, 300), SceneLayout.layout(Scene.SOLO, TrainerSide.LEFT, 400, 300).pokemon)
+    }
+
+    @Test
+    fun `a Pokemon alone on a battlefield stands on the far platform, not in mid-air`() {
+        val stage = SceneLayout.Stage(foe = SceneLayout.Point(0.75, 0.53), player = SceneLayout.Point(0.25, 1.0))
+        val alone = SceneLayout.layout(Scene.SOLO, TrainerSide.LEFT, 400, 300, stage, onBattlefield = true)
+        val battle = SceneLayout.layout(Scene.BATTLE, TrainerSide.LEFT, 400, 300, stage)
+        assertEquals(battle.pokemon, alone.pokemon)
+        assertTrue(alone.anchorBottom)
+        assertNull(alone.trainer)
+    }
+
+    @Test
     fun `fitting keeps the aspect ratio and stands on the floor when asked`() {
         val box = SceneLayout.Box(10, 20, 100, 200)
         val standing = SceneLayout.fit(64, 64, box, anchorBottom = true)

@@ -65,6 +65,7 @@ import com.pokewidgets.app.data.TrainerSide
 import com.pokewidgets.app.data.WidgetConfig
 import com.pokewidgets.app.catalog.FormRules
 import com.pokewidgets.app.catalog.SpriteSet
+import com.pokewidgets.app.sprite.DrawnScenery
 import com.pokewidgets.app.sprite.IdleAnimator
 import com.pokewidgets.app.sprite.IdleStyle
 import com.pokewidgets.app.ui.BackgroundMode
@@ -222,8 +223,14 @@ private fun PreviewPanel(state: ConfigUiState) {
             if (background != null) {
                 BattleBackgroundImage(background, Modifier.fillMaxSize(), mirrored = mirrorScene)
             }
-            val stage = background?.let { SceneLayout.battleFrame(it, w, h).second } ?: SceneLayout.OPEN_STAGE
-            val layout = SceneLayout.layout(scene, config.trainerSide, w, h, stage)
+            val onScenery = background?.isScenery == true
+            val stage = background?.takeIf { !onScenery }?.let { SceneLayout.battleFrame(it, w, h).second }
+                ?: SceneLayout.OPEN_STAGE
+            val layout = SceneLayout.layout(
+                scene, config.trainerSide, w, h, stage,
+                onScenery = onScenery,
+                onBattlefield = background != null && !onScenery,
+            )
             val align = if (layout.anchorBottom) Alignment.BottomCenter else Alignment.Center
 
             @Composable
@@ -511,11 +518,16 @@ private fun AppearanceSection(
     onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit,
 ) {
     val c = state.config
-    val mode = c.backgroundMode
+    val mode = c.backgroundMode(state.backgrounds)
     Panel {
         SectionHeader("Background")
         OptionRow(
-            options = BackgroundMode.entries,
+            // Battlefields have their platforms painted in, which only make sense in a battle:
+            // they are offered with the Battle layout, and kept visible for a widget that
+            // already has one so it can still be changed.
+            options = BackgroundMode.entries.filter {
+                it != BackgroundMode.BATTLE || c.effectiveScene == Scene.BATTLE || mode == BackgroundMode.BATTLE
+            },
             selected = mode,
             label = { it.label },
             onSelect = actions.setBackgroundMode,
@@ -525,7 +537,8 @@ private fun AppearanceSection(
             when (mode) {
                 BackgroundMode.OFF -> "The sprite floats on your wallpaper."
                 BackgroundMode.COLOR -> "A plain plate behind the sprite."
-                BackgroundMode.BATTLE -> "A battlefield from the games, behind the sprite."
+                BackgroundMode.SCENERY -> "Open skies and landscapes. Your Pokémon stands on the ground, wherever it is."
+                BackgroundMode.BATTLE -> "A battlefield from the games, with the Pokémon on its far platform."
             },
         )
 
@@ -564,14 +577,15 @@ private fun AppearanceSection(
             }
         }
 
-        AnimatedVisibility(visible = mode == BackgroundMode.BATTLE) {
+        AnimatedVisibility(visible = mode == BackgroundMode.SCENERY || mode == BackgroundMode.BATTLE) {
             Column {
                 Spacer(Modifier.height(12.dp))
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(vertical = 4.dp),
                 ) {
-                    items(state.backgrounds?.backgrounds.orEmpty(), key = { it.id }) { bg ->
+                    val choices = if (mode == BackgroundMode.SCENERY) state.backgrounds?.scenery else state.backgrounds?.battlefields
+                    items(choices.orEmpty(), key = { it.id }) { bg ->
                         BackgroundThumb(
                             background = bg,
                             selected = bg.id == c.backgroundId,
@@ -919,18 +933,36 @@ private fun BattleBackgroundImage(background: BattleBackground, modifier: Modifi
         val boxW = maxWidth.value
         val boxH = maxHeight.value
         // The same crop the widget uses, so platforms line up with where figures stand.
-        val (crop, _) = SceneLayout.battleFrame(background, boxW.roundToInt().coerceAtLeast(1), boxH.roundToInt().coerceAtLeast(1))
+        val w = boxW.roundToInt().coerceAtLeast(1)
+        val h = boxH.roundToInt().coerceAtLeast(1)
+        val crop = if (background.isScenery) SceneLayout.sceneryCrop(background, w, h) else SceneLayout.battleFrame(background, w, h).first
         val scale = maxOf(boxW / crop.width, boxH / crop.height)
         val dx = -crop.left * scale - (crop.width * scale - boxW) / 2
         val dy = -crop.top * scale - (crop.height * scale - boxH) / 2
-        AsyncImage(
-            model = background.url,
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier
-                .wrapContentSize(Alignment.TopStart, unbounded = true)
-                .offset(dx.dp, dy.dp)
-                .requiredSize((background.w * scale).dp, (background.h * scale).dp),
-        )
+        val placed = Modifier
+            .wrapContentSize(Alignment.TopStart, unbounded = true)
+            .offset(dx.dp, dy.dp)
+            .requiredSize((background.w * scale).dp, (background.h * scale).dp)
+        if (background.isDrawn) {
+            val image = remember(background.id) { DrawnScenery.bitmap(background.id)?.asImageBitmap() }
+            if (image != null) {
+                Image(
+                    bitmap = image,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    filterQuality = FilterQuality.None,
+                    modifier = placed,
+                )
+            }
+        } else {
+            AsyncImage(
+                model = background.url,
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                // Scenery is pixel art and stays crisp; Showdown's battlefields are painted.
+                filterQuality = if (background.isScenery) FilterQuality.None else FilterQuality.Low,
+                modifier = placed,
+            )
+        }
     }
 }

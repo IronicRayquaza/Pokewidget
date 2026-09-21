@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
+import com.pokewidgets.app.sprite.DrawnScenery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -70,7 +71,10 @@ class CatalogRepository private constructor(context: Context) {
     suspend fun backgrounds(): BackgroundIndex = backgrounds ?: loadLock.withLock {
         backgrounds ?: withContext(Dispatchers.IO) {
             val text = appContext.assets.open("backgrounds.json").bufferedReader().use { it.readText() }
-            json.decodeFromString<BackgroundIndex>(text).also { backgrounds = it }
+            // The scenes the app draws itself lead the list, ahead of the downloaded ones.
+            json.decodeFromString<BackgroundIndex>(text)
+                .let { it.copy(backgrounds = DrawnScenery.backgrounds + it.backgrounds) }
+                .also { backgrounds = it }
         }
     }
 

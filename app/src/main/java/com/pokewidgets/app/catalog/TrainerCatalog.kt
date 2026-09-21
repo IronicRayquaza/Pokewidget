@@ -115,20 +115,47 @@ data class BattleBackground(
     val foe: List<Double>? = null,
     /** Where the trainer stands — the near platform — as `[x, y]` fractions of the scenery. */
     val player: List<Double>? = null,
+    /** [KIND_BATTLE], [KIND_SCENERY] or [KIND_DRAWN]. */
+    val kind: String = KIND_BATTLE,
 ) {
-    /** "Gen 3 · Cave" — backgrounds repeat labels across generations. */
-    val displayName: String get() = if (gen <= 4) "Gen $gen · $label" else label
+    /**
+     * Scenery has no platforms: figures stand on its ground wherever they are, which suits
+     * any Pokémon. The downloaded scenery and the scenes the app draws itself both count.
+     */
+    val isScenery: Boolean get() = kind == KIND_SCENERY || kind == KIND_DRAWN
+
+    /** Drawn by the app (see `DrawnScenery`) rather than downloaded; [url] is empty. */
+    val isDrawn: Boolean get() = kind == KIND_DRAWN
+
+    /** "Gen 3 · Cave" — battlefields repeat labels across generations; scenery does not. */
+    val displayName: String get() = if (!isScenery && gen in 1..4) "Gen $gen · $label" else label
 }
+
+const val KIND_BATTLE = "battle"
+const val KIND_SCENERY = "scenery"
+const val KIND_DRAWN = "drawn"
 
 @Serializable
 data class BackgroundIndex(
     val sha: String,
+    /** The PokéRogue commit the scenery is pinned to. */
+    val pokerogueSha: String? = null,
     val backgrounds: List<BattleBackground>,
 ) {
     fun background(id: String?): BattleBackground? = id?.let { wanted -> backgrounds.firstOrNull { it.id == wanted } }
 
-    /** The background that matches a sprite set's generation, for the "Battle scene" preset. */
+    val battlefields: List<BattleBackground> get() = backgrounds.filter { !it.isScenery }
+
+    val scenery: List<BattleBackground> get() = backgrounds.filter { it.isScenery }
+
+    /** The battlefield that matches a sprite set's generation, for the "Battle scene" preset. */
     fun defaultFor(gen: Int): BattleBackground =
-        backgrounds.firstOrNull { it.gen == gen && !it.id.contains('-') }
+        battlefields.firstOrNull { it.gen == gen && !it.id.contains('-') }
             ?: backgrounds.first { it.id == "route" }
+
+    /** Where the Scenery option starts: a clear day over open grass suits almost any Pokémon. */
+    fun defaultScenery(): BattleBackground? =
+        scenery.firstOrNull { it.id == "drawn-day" }
+            ?: scenery.firstOrNull { it.id == "scenery-plains" }
+            ?: scenery.firstOrNull()
 }

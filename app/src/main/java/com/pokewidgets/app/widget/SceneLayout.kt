@@ -48,8 +48,19 @@ object SceneLayout {
     )
 
     /**
+     * Where the ground is on scenery, as a fraction of the widget's height. Scenery has no
+     * platforms, so figures simply stand here, a little way into the ground below the horizon.
+     */
+    const val GROUND = 0.86
+
+    /**
      * @param stage where the battle platforms are in this widget, for a trainer standing on
      *   the left; a right-hand trainer mirrors it. Only [Scene.BATTLE] uses it.
+     * @param onScenery the background is scenery: figures stand on its ground, at [GROUND],
+     *   rather than floating in the middle of the sky.
+     * @param onBattlefield the background is a battlefield with its platforms painted in: a
+     *   Pokémon on its own stands on the far one, as it would in a battle, instead of floating
+     *   in the middle of the picture beside it.
      */
     fun layout(
         scene: Scene,
@@ -57,21 +68,49 @@ object SceneLayout {
         width: Int,
         height: Int,
         stage: Stage = OPEN_STAGE,
+        onScenery: Boolean = false,
+        onBattlefield: Boolean = false,
     ): Layout {
-        val whole = Box(0, 0, width, height)
         val onLeft = side == TrainerSide.LEFT
         fun mirror(box: Box) = if (onLeft) box else box.copy(left = width - box.right)
+        val floor = if (onScenery) (height * GROUND).roundToInt() else height
+
+        // The Pokémon's feet go a little below the platform's centre, the way the games plant
+        // a sprite in its shadow rather than balance it on the rim.
+        fun onFarPlatform(): Box {
+            val footX = stage.foe.x * width
+            val footY = (stage.foe.y + 0.06) * height
+            val halfWidth = min(min(footX, width - footX), width * 0.3)
+            val bottom = min(height.toDouble(), footY)
+            val tall = min(bottom, height * 0.7)
+            return Box(
+                (footX - halfWidth).roundToInt(),
+                (bottom - tall).roundToInt(),
+                max(1, (halfWidth * 2).roundToInt()),
+                max(1, tall.roundToInt()),
+            )
+        }
 
         return when (scene) {
-            // Exactly the pre-trainer widget: the whole box, centred.
-            Scene.SOLO -> Layout(whole, trainer = null, trainerInFront = false, anchorBottom = false)
+            // Exactly the pre-trainer widget: the whole box, centred. On scenery the Pokémon
+            // stands on the ground instead; on a battlefield, on the far platform painted into
+            // the picture.
+            Scene.SOLO -> when {
+                onBattlefield -> Layout(onFarPlatform(), trainer = null, trainerInFront = false, anchorBottom = true)
+                else -> Layout(
+                    pokemon = Box(0, 0, width, floor),
+                    trainer = null,
+                    trainerInFront = false,
+                    anchorBottom = onScenery,
+                )
+            }
 
             Scene.SIDE_BY_SIDE -> {
                 val trainerW = (width * 0.42).roundToInt()
                 val trainerTop = (height * 0.08).roundToInt()
                 Layout(
-                    pokemon = mirror(Box(trainerW, 0, width - trainerW, height)),
-                    trainer = mirror(Box(0, trainerTop, trainerW, height - trainerTop)),
+                    pokemon = mirror(Box(trainerW, 0, width - trainerW, floor)),
+                    trainer = mirror(Box(0, trainerTop, trainerW, floor - trainerTop)),
                     trainerInFront = false,
                     anchorBottom = true,
                 )
@@ -80,19 +119,7 @@ object SceneLayout {
             // The opening of a battle: the trainer from behind, in the foreground on the near
             // platform, and the Pokémon standing on the far one.
             Scene.BATTLE -> {
-                // The Pokémon's feet go a little below the platform's centre, the way the games
-                // plant a sprite in its shadow rather than balance it on the rim.
-                val footX = stage.foe.x * width
-                val footY = (stage.foe.y + 0.06) * height
-                val halfWidth = min(min(footX, width - footX), width * 0.3)
-                val bottom = min(height.toDouble(), footY)
-                val tall = min(bottom, height * 0.7)
-                val pokemon = Box(
-                    (footX - halfWidth).roundToInt(),
-                    (bottom - tall).roundToInt(),
-                    max(1, (halfWidth * 2).roundToInt()),
-                    max(1, tall.roundToInt()),
-                )
+                val pokemon = onFarPlatform()
 
                 // Back sprites are square, so the trainer's box is square too: as wide as it is
                 // tall where the widget allows, which keeps them from shrinking to a sliver in a
@@ -138,6 +165,16 @@ object SceneLayout {
             ((p.y * scenery.height - top) / cover.height).coerceIn(0.2, 1.0),
         )
         return crop to Stage(inCrop(foe), inCrop(player))
+    }
+
+    /**
+     * Which part of a scenery image shows: centred across, and low enough that the ground —
+     * where everyone stands — stays in view when a wide, short widget can only show a band.
+     */
+    fun sceneryCrop(background: BattleBackground, boxW: Int, boxH: Int): Box {
+        val cover = coverCrop(background.w, background.h, boxW, boxH)
+        val top = ((background.h - cover.height) * 0.7).roundToInt().coerceIn(0, background.h - cover.height)
+        return cover.copy(top = top)
     }
 
     /**

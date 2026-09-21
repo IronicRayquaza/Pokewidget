@@ -33,3 +33,7 @@ web/src-tauri/gen/
 
 # Copied out of the Android app by web/scripts/sync-data.mjs before every dev run and build.
 web/public/data/
+
+# Vendored Windows binaries. `jq.exe` arrived twice, 985 KB each, while poking at the
+# releases API. Nothing in the build needs a checked-in executable.
+*.exe

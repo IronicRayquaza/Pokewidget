@@ -1,5 +1,6 @@
 package com.pokewidgets.app.catalog
 
+import com.pokewidgets.app.sprite.DrawnScenery
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -70,11 +71,25 @@ class TrainerCatalogTest {
     @Test
     fun `backgrounds are pinned, sized and have a default for every generation`() {
         assertTrue(backgrounds.backgrounds.size >= 20)
-        for (bg in backgrounds.backgrounds) {
+        for (bg in backgrounds.battlefields) {
             assertTrue(bg.url.contains(backgrounds.sha))
             assertTrue(bg.w > 0 && bg.h > 0)
         }
         for (gen in 1..9) assertNotNull(backgrounds.defaultFor(gen))
         assertEquals("gen3", backgrounds.defaultFor(3).id)
+    }
+
+    @Test
+    fun `scenery is pinned, and never stands in for a battlefield`() {
+        val scenery = backgrounds.scenery
+        assertTrue("expected a good choice of scenery, got ${scenery.size}", scenery.size >= 30)
+        for (bg in scenery) assertTrue(bg.url.contains(backgrounds.pokerogueSha!!))
+        assertEquals("scenery-plains", backgrounds.defaultScenery()?.id)
+        // With the app's own scenes added, as the catalog serves it, a drawn one leads.
+        val served = backgrounds.copy(backgrounds = DrawnScenery.backgrounds + backgrounds.backgrounds)
+        assertEquals("drawn-day", served.defaultScenery()?.id)
+        assertTrue(served.battlefields.none { it.isDrawn })
+        for (gen in 1..9) assertTrue(!backgrounds.defaultFor(gen).isScenery)
+        assertTrue(backgrounds.battlefields.none { it.isScenery })
     }
 }

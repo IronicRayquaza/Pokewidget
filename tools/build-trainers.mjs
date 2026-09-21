@@ -17,6 +17,8 @@
  *  - Trainer backs come from pret's decompilations, pinned to one commit each, and exist
  *    only for the handful of player characters the games show from behind.
  *  - Battle backgrounds come from the Showdown client repository, pinned to one commit.
+ *  - Scenery — calm biome backdrops, used without their platforms — comes from PokéRogue's art
+ *    repository, pinned to one commit. See SCENERY in trainers.config.mjs.
  *
  * Who each trainer is — region, role, a readable name — lives in trainers.config.mjs.
  */
@@ -25,8 +27,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  BACK_SPRITES, BACKGROUNDS, CHARACTERS, CLASS_NAMES, PRET, REGION_BY_GEN, REGIONS, ROLES,
-  SHOWDOWN_CLIENT_SHA, VARIANT_LABELS,
+  BACK_SPRITES, BACKGROUNDS, CHARACTERS, CLASS_NAMES, POKEROGUE_SHA, PRET, REGION_BY_GEN, REGIONS, ROLES,
+  SCENERY, SHOWDOWN_CLIENT_SHA, VARIANT_LABELS,
 } from './trainers.config.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -153,7 +155,25 @@ async function main() {
     });
     console.log(`     ${id.padEnd(16)} ${w}x${h}`);
   }
-  write('backgrounds.json', { sha: SHOWDOWN_CLIENT_SHA, backgrounds });
+
+  console.log('==> scenery');
+  const PR = `https://cdn.jsdelivr.net/gh/pagefaultgames/pokerogue-assets@${POKEROGUE_SHA}/images/arenas`;
+  const PR_RAW = `https://raw.githubusercontent.com/pagefaultgames/pokerogue-assets/${POKEROGUE_SHA}/images/arenas`;
+  for (const [id, label] of SCENERY) {
+    const { w, h } = pngSize(await get(`${PR}/${id}_bg.png`));
+    backgrounds.push({
+      id: `scenery-${id.replace(/_/g, '-')}`,
+      label,
+      gen: 0,
+      kind: 'scenery',
+      url: `${PR}/${id}_bg.png`,
+      fallbackUrl: `${PR_RAW}/${id}_bg.png`,
+      w,
+      h,
+    });
+    console.log(`     ${id.padEnd(18)} ${w}x${h}`);
+  }
+  write('backgrounds.json', { sha: SHOWDOWN_CLIENT_SHA, pokerogueSha: POKEROGUE_SHA, backgrounds });
 }
 
 function write(name, data) {

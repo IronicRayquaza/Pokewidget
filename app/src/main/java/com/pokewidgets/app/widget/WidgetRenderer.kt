@@ -27,6 +27,7 @@ import com.pokewidgets.app.data.WidgetConfigStore
 import com.pokewidgets.app.sprite.BitmapOps
 import com.pokewidgets.app.sprite.DecodedSprite
 import com.pokewidgets.app.sprite.FramePlanner
+import com.pokewidgets.app.sprite.DrawnScenery
 import com.pokewidgets.app.sprite.GifFrames
 import com.pokewidgets.app.sprite.IdleAnimator
 import com.pokewidgets.app.sprite.IdleFrame
@@ -250,6 +251,8 @@ class WidgetRenderer(private val context: Context) {
         val background = config.backgroundId?.let { id ->
             runCatching {
                 val entry = catalog.backgrounds().background(id) ?: return@runCatching null
+                // The app's own scenes are drawn on the spot: nothing to download.
+                if (entry.isDrawn) return@runCatching DrawnScenery.bitmap(id)?.let { it to entry }
                 val bytes = source.backgroundBytes(entry) ?: return@runCatching null
                 android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                     ?.let { it to entry }
@@ -281,38 +284,21 @@ class WidgetRenderer(private val context: Context) {
 
         // A trainer that could not be loaded leaves the widget as a plain Pokémon widget.
         val scene = if (layers.trainer == null) Scene.SOLO else config.effectiveScene
-        var stage = SceneLayout.OPEN_STAGE
-
-        // Background first, so everything else composites over it.
         val battleBackground = layers.background
-        val backgroundEntry = layers.backgroundEntry
-        if (battleBackground != null && backgroundEntry != null) {
-            val (plateW, plateH) = SceneLayout.plateSize(boxW, boxH, minOf(MAX_BACKGROUND_BYTES, budget / 4))
-            val (crop, framed) = SceneLayout.battleFrame(backgroundEntry, boxW, boxH)
-            stage = framed
-            val plate = BitmapOps.battlePlate(
-                battleBackground,
-                android.graphics.Rect(crop.left, crop.top, crop.right, crop.bottom),
-                plateW,
-                plateH,
-                radiusPx * plateW / boxW,
-            ).let {
-                // A trainer on the right turns the whole scene round, platforms included, so
-                // the Pokémon still stands on one.
-                if (scene == Scene.BATTLE && config.trainerSide == TrainerSide.RIGHT) BitmapOps.mirrored(it) else it
-            }
-            views.setImageViewBitmap(R.id.widget_background, plate)
-            views.setViewVisibility(R.id.widget_background, View.VISIBLE)
-            spriteBudget -= plate.byteCount
-        } else if (config.showBackground) {
-            views.setImageViewBitmap(
-                R.id.widget_background,
-                BitmapOps.roundedPlate(boxW, boxH, config.backgroundColor, radiusPx),
-            )
-            views.setViewVisibility(R.id.widget_background, View.VISIBLE)
-        } else {
-            views.setViewVisibility(R.id.widget_background, View.GONE)
+        val backgroundEntry = layers.backgroundEntry?.takeIf { battleBackground != null }
+        val onScenery = backgroundEntry?.isScenery == true
+        val mirrorScene = scene == Scene.BATTLE && config.trainerSide == TrainerSide.RIGHT
+
+        // The background is drawn last, but its memory is set aside first, so the sprite is
+        // planned against what will really be left.
+        val plateSize = backgroundEntry?.let {
+            SceneLayout.plateSize(boxW, boxH, minOf(MAX_BACKGROUND_BYTES, budget / 4))
         }
+        plateSize?.let { (w, h) -> spriteBudget -= w.toLong() * h * 4 }
+
+        val battleFrame = backgroundEntry?.takeIf { !onScenery }?.let { SceneLayout.battleFrame(it, boxW, boxH) }
+        val stage = battleFrame?.second ?: SceneLayout.OPEN_STAGE
+
         views.setViewVisibility(R.id.widget_status, View.GONE)
         views.setViewVisibility(R.id.widget_flipper, View.VISIBLE)
         views.removeAllViews(R.id.widget_flipper)
@@ -321,7 +307,11 @@ class WidgetRenderer(private val context: Context) {
         // from behind the Pokémon to in front of it was drawn twice, once in each place.
         resetScene(views)
 
-        val layout = SceneLayout.layout(scene, config.trainerSide, boxW, boxH, stage)
+        val layout = SceneLayout.layout(
+            scene, config.trainerSide, boxW, boxH, stage,
+            onScenery = onScenery,
+            onBattlefield = battleFrame != null,
+        )
         val trainerBox = layout.trainer
         if (trainerBox != null && layers.trainer != null) {
             spriteBudget -= addTrainer(views, layers, layout, trainerBox, boxW, boxH, budget / 5)
@@ -338,10 +328,10 @@ class WidgetRenderer(private val context: Context) {
             addIdleFrames(views, decoded, bounds, config, set, box.width, box.height, spriteBudget, speedUp)
         }
 
-        if (scene != Scene.SOLO) {
-            // The frames centre themselves in the flipper, so standing the Pokémon on the
-            // floor of its box is a matter of moving the whole flipper down by the slack.
-            val drop = if (layout.anchorBottom) ((box.height - shownHeight) / 2).coerceAtLeast(0) else 0
+        // The frames centre themselves in the flipper, so standing the Pokémon on the floor of
+        // its box is a matter of moving the whole flipper down by the slack.
+        val drop = if (layout.anchorBottom) ((box.height - shownHeight) / 2).coerceAtLeast(0) else 0
+        if (scene != Scene.SOLO || layout.anchorBottom) {
             views.setViewPadding(
                 R.id.widget_flipper,
                 box.left,
@@ -349,6 +339,33 @@ class WidgetRenderer(private val context: Context) {
                 boxW - box.right,
                 boxH - box.bottom - drop,
             )
+        }
+
+        if (battleBackground != null && backgroundEntry != null && plateSize != null) {
+            val (plateW, plateH) = plateSize
+            val crop = battleFrame?.first ?: SceneLayout.sceneryCrop(backgroundEntry, boxW, boxH)
+
+            val plate = BitmapOps.battlePlate(
+                battleBackground,
+                android.graphics.Rect(crop.left, crop.top, crop.right, crop.bottom),
+                plateW,
+                plateH,
+                radiusPx * plateW / boxW,
+                // A trainer on the right turns the whole battlefield round, platforms
+                // included, so the Pokémon still stands on one.
+                mirrored = mirrorScene && !onScenery,
+                pixelArt = onScenery,
+            )
+            views.setImageViewBitmap(R.id.widget_background, plate)
+            views.setViewVisibility(R.id.widget_background, View.VISIBLE)
+        } else if (config.showBackground) {
+            views.setImageViewBitmap(
+                R.id.widget_background,
+                BitmapOps.roundedPlate(boxW, boxH, config.backgroundColor, radiusPx),
+            )
+            views.setViewVisibility(R.id.widget_background, View.VISIBLE)
+        } else {
+            views.setViewVisibility(R.id.widget_background, View.GONE)
         }
 
         views.setOnClickPendingIntent(R.id.widget_root, tapIntent(widgetId, config))

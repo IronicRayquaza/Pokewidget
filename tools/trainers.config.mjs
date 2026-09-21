@@ -365,3 +365,53 @@ export const BACKGROUNDS = [
 ];
 
 export { gen };
+
+/**
+ * Calm scenery for behind a Pokémon when a battle is not wanted: the biome backdrops from
+ * PokéRogue, a Pokémon fan game whose art follows the Gen 5 style. Each is a scene with no
+ * battle interface and no platform painted in; PokéRogue's separate platform images are left
+ * out on purpose, so a Pokémon simply stands on the ground wherever it lands.
+ *
+ * Pinned to one commit of pagefaultgames/pokerogue-assets. The art is the community's, under
+ * CC-BY-NC-SA 4.0 (and fair use for Nintendo's own material): credit it, never sell it.
+ */
+export const POKEROGUE_SHA = '81f8e60c3c57ccdcddb3c41dd54d4748cb3b5aad';
+
+export const SCENERY = [
+  ['plains', 'Plains'],
+  ['grass', 'Grassland'],
+  ['tall_grass', 'Tall Grass'],
+  ['meadow', 'Meadow'],
+  ['forest', 'Forest'],
+  ['jungle', 'Jungle'],
+  ['snowy_forest', 'Snowy Forest'],
+  ['swamp', 'Swamp'],
+  ['lake', 'Lake'],
+  ['beach', 'Beach'],
+  ['rockycoast', 'Rocky Coast'],
+  ['island', 'Island'],
+  ['sea', 'Open Sea'],
+  ['seabed', 'Seabed'],
+  ['mountain', 'Mountain'],
+  ['badlands', 'Badlands'],
+  ['desert', 'Desert'],
+  ['volcano', 'Volcano'],
+  ['cave', 'Cave'],
+  ['ice_cave', 'Ice Cave'],
+  ['fairy_cave', 'Fairy Cave'],
+  ['well', 'Well'],
+  ['town', 'Town'],
+  ['metropolis', 'City'],
+  ['slum', 'Back Alley'],
+  ['construction_site', 'Construction Site'],
+  ['factory', 'Factory'],
+  ['power_plant', 'Power Plant'],
+  ['laboratory', 'Laboratory'],
+  ['dojo', 'Dojo'],
+  ['temple', 'Temple'],
+  ['ruins', 'Ruins'],
+  ['graveyard', 'Graveyard'],
+  ['wasteland', 'Wasteland'],
+  ['abyss', 'Abyss'],
+  ['space', 'Space'],
+];

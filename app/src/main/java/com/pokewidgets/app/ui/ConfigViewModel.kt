@@ -70,15 +70,17 @@ data class ConfigUiState(
 enum class BackgroundMode(val label: String) {
     OFF("None"),
     COLOR("Colour"),
-    BATTLE("Battle scene"),
+    SCENERY("Scenery"),
+    BATTLE("Battlefield"),
 }
 
-val WidgetConfig.backgroundMode: BackgroundMode
-    get() = when {
-        backgroundId != null -> BackgroundMode.BATTLE
-        showBackground -> BackgroundMode.COLOR
-        else -> BackgroundMode.OFF
-    }
+/** Which kind of background is chosen. Scenery and battlefields share one stored id. */
+fun WidgetConfig.backgroundMode(backgrounds: BackgroundIndex?): BackgroundMode = when {
+    backgroundId != null ->
+        if (backgrounds?.background(backgroundId)?.isScenery == true) BackgroundMode.SCENERY else BackgroundMode.BATTLE
+    showBackground -> BackgroundMode.COLOR
+    else -> BackgroundMode.OFF
+}
 
 class ConfigViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -171,9 +173,16 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
             when (mode) {
                 BackgroundMode.OFF -> c.copy(showBackground = false, backgroundId = null)
                 BackgroundMode.COLOR -> c.copy(showBackground = true, backgroundId = null)
+                // Switching kind keeps the current picture only when it is already that kind.
+                BackgroundMode.SCENERY -> c.copy(
+                    showBackground = true,
+                    backgroundId = c.backgroundId?.takeIf { library?.background(it)?.isScenery == true }
+                        ?: library?.defaultScenery()?.id,
+                )
                 BackgroundMode.BATTLE -> c.copy(
                     showBackground = true,
-                    backgroundId = c.backgroundId ?: library?.defaultFor(gen)?.id,
+                    backgroundId = c.backgroundId?.takeIf { library?.background(it)?.isScenery == false }
+                        ?: library?.defaultFor(gen)?.id,
                 )
             }
         }
@@ -200,7 +209,9 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
                 // The Pokémon is the one being faced, so it shows its front.
                 back = false,
                 showBackground = true,
-                backgroundId = it.backgroundId ?: current.backgrounds?.defaultFor(set.gen)?.id,
+                // A battle needs a battlefield: scenery is swapped for this generation's one.
+                backgroundId = it.backgroundId?.takeIf { id -> current.backgrounds?.background(id)?.isScenery == false }
+                    ?: current.backgrounds?.defaultFor(set.gen)?.id,
             )
         }
     }

@@ -277,7 +277,15 @@ object BitmapOps {
      *
      * @param crop the part of [source] to use; see `SceneLayout.coverCrop`.
      */
-    fun battlePlate(source: Bitmap, crop: Rect, widthPx: Int, heightPx: Int, cornerRadiusPx: Float): Bitmap {
+    fun battlePlate(
+        source: Bitmap,
+        crop: Rect,
+        widthPx: Int,
+        heightPx: Int,
+        cornerRadiusPx: Float,
+        mirrored: Boolean = false,
+        pixelArt: Boolean = false,
+    ): Bitmap {
         val out = Bitmap.createBitmap(widthPx.coerceAtLeast(1), heightPx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         val bounds = RectF(0f, 0f, out.width.toFloat(), out.height.toFloat())
@@ -287,7 +295,17 @@ object BitmapOps {
             }
             canvas.clipPath(clip)
         }
-        canvas.drawBitmap(source, crop, bounds, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
+        // Scenery is pixel art and is kept crisp; Showdown's battlefields are painted and are
+        // smoothed.
+        val paint = if (pixelArt) Paint() else Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+        if (mirrored) {
+            canvas.save()
+            canvas.scale(-1f, 1f, out.width / 2f, 0f)
+            canvas.drawBitmap(source, crop, bounds, paint)
+            canvas.restore()
+        } else {
+            canvas.drawBitmap(source, crop, bounds, paint)
+        }
         return out
     }
 
