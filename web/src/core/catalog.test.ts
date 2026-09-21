@@ -18,11 +18,8 @@ import {
   spriteUrl,
 } from './catalog';
 
-// Corrected path: Assumes data files are in a 'data/' directory at the repository root.
-// From web/src/core/, ' Corsica/../..' takes it to the repository root.
-// Then 'data' points to the 'data' folder at the root.
 const read = <T>(name: string): T =>
-  JSON.parse(readFileSync(resolve(__dirname, '../../../data', name), 'utf8')) as T;
+  JSON.parse(readFileSync(resolve(__dirname, '../../public/data', name), 'utf8')) as T;
 
 const sets = read<SpriteSetIndex>('sets.json');
 const pokemon = read<{ pokemon: PokemonEntry[] }>('catalog.json').pokemon;

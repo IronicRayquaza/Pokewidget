@@ -9,7 +9,7 @@
     "dev": "npm run sync-data && vite",
     "build": "npm run sync-data && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "npm run sync-data && vitest run",
     "tauri": "tauri"
   },
   "devDependencies": {
