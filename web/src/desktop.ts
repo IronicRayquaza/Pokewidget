@@ -17,6 +17,7 @@ interface TauriWindow {
   setFocus(): Promise<void>;
   startDragging(): Promise<void>;
   startResizeDragging(direction: ResizeDirection): Promise<void>;
+  setAlwaysOnBottom(onBottom: boolean): Promise<void>;
 }
 
 interface TauriApi {
@@ -104,3 +105,10 @@ export const startMove = (): void => void current()?.startDragging();
 
 /** Hands a drag on the resize grip to the OS, which resizes the window from its bottom right. */
 export const startResize = (): void => void current()?.startResizeDragging('SouthEast');
+
+/**
+ * Sends this window down onto the desktop. The window is created "always on bottom", but on
+ * Windows that only takes hold at its next move: a new window still opens above the apps.
+ * Asking once more when the widget page loads puts it straight down under them.
+ */
+export const sinkToDesktop = (): void => void current()?.setAlwaysOnBottom(true);

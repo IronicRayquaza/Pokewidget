@@ -1,14 +1,18 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the app's own pages are allowed to do: make widget windows, and move, resize and close them.",
+  "description": "What the app's own pages are allowed to do: put widget windows on the desktop, move, resize and close them, and bring the settings window back.",
   "windows": ["main", "widget-*"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
-    "core:window:allow-set-always-on-top",
+    "core:window:allow-start-resize-dragging",
+    "core:window:allow-set-always-on-bottom",
     "core:window:allow-set-size",
     "core:window:allow-set-position",
+    "core:window:allow-show",
+    "core:window:allow-unminimize",
+    "core:window:allow-set-focus",
     "core:window:allow-close",
     "core:webview:allow-create-webview-window",
     "window-state:default"

@@ -5,7 +5,7 @@ import { loadCatalogs, type Catalogs } from './core/data';
 import { displayName } from './core/catalog';
 import { getWidget, onWidgetsChanged, requestEdit, type PlacedWidget } from './core/store';
 import { playCry, preloadCry } from './core/audio';
-import { removeFromDesktop, showSettings, startMove, startResize } from './desktop';
+import { removeFromDesktop, showSettings, sinkToDesktop, startMove, startResize } from './desktop';
 import { WidgetView } from './ui/WidgetView';
 import { usePressOrDrag, WidgetChrome } from './ui/WidgetChrome';
 
@@ -22,6 +22,7 @@ function WidgetWindow({ id }: { id: number }) {
   const size = useWindowSize();
 
   useEffect(() => {
+    sinkToDesktop();
     loadCatalogs().then(setCatalogs).catch(() => setCatalogs(null));
   }, []);
 
