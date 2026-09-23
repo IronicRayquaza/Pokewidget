@@ -69,3 +69,24 @@ export function nextFreeSpot(
   }
   return { x: GAP, y: lowest + GAP, ...size };
 }
+
+/**
+ * Where to draw each widget on a screen `canvasWidth` wide, in the order given.
+ *
+ * A widget that fits is drawn exactly where it was left, even on top of another: that is
+ * where someone put it. One that had to be pulled in from a wider screen and would now land
+ * on another goes to the next free spot instead, so a narrow tab reflows like a phone rather
+ * than piling widgets up. Only the drawing changes; the saved spots stay as they were.
+ */
+export function arrange(rects: Rect[], canvasWidth: number): Rect[] {
+  const drawn: Rect[] = [];
+  for (const rect of rects) {
+    const kept = clampRect(rect, canvasWidth, Number.POSITIVE_INFINITY);
+    const moved = kept.x !== rect.x || kept.y !== rect.y || kept.width !== rect.width;
+    const covers = drawn.some((other) => overlaps(kept, other, 0));
+    drawn.push(
+      moved && covers ? nextFreeSpot(drawn, { width: kept.width, height: kept.height }, canvasWidth) : kept,
+    );
+  }
+  return drawn;
+}

@@ -397,3 +397,284 @@ img.pixel-art {
   font-size: 13px;
   padding: 24px 12px;
 }
+
+/* ---- The browser tab as a home screen -------------------------------------- */
+
+.home-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 16px;
+}
+
+.home-bar .caption,
+.home-note {
+  margin: 0;
+}
+
+.home-note {
+  padding: 0 16px 8px;
+}
+
+/* Widgets are placed on this, by their own coordinates. The page's dotted paper shows
+   through: nothing here paints a background. */
+.home {
+  position: relative;
+  margin: 0 16px;
+}
+
+/* While the sheet is open beside it, the home screen narrows to the space that is left, so
+   the widget being edited is never hidden behind the sheet. */
+@media (min-width: 861px) {
+  .home-page[data-editing] {
+    padding-right: 460px;
+  }
+}
+
+.home-empty {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translate(-50%, -50%);
+  width: min(380px, 100%);
+  margin: 0;
+}
+
+/* ---- A placed widget, on the tab or on the desktop -------------------------- */
+
+.placed {
+  position: absolute;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  border-radius: 12px;
+  outline: none;
+}
+
+.placed[data-moving] {
+  cursor: grabbing;
+  z-index: 2;
+}
+
+/* The outline that says "this one": on hover, on keyboard focus, and while it is being
+   edited. It sits just outside the widget so it never covers the sprite. */
+.placed::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 1px dashed var(--ink);
+  border-radius: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease-out;
+}
+
+.placed:hover::after,
+.placed[data-selected]::after {
+  opacity: 0.6;
+}
+
+.placed:focus-visible::after {
+  border: 2px solid var(--ink);
+  opacity: 1;
+}
+
+/* A desktop widget fills its own window, so the outline has to sit inside it. */
+.placed.desktop {
+  position: fixed;
+  inset: 0;
+}
+
+.placed.desktop::after {
+  inset: 0;
+}
+
+.placed-chrome {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition-property: opacity, visibility;
+  transition-duration: 0.15s;
+  transition-timing-function: ease-out;
+}
+
+.placed:hover .placed-chrome,
+.placed:focus-within .placed-chrome,
+.placed[data-selected] .placed-chrome {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Hidden while dragging, so the controls do not ride along over the sprite. */
+.placed[data-moving] .placed-chrome {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.placed-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+button.chip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  box-shadow: 0 2px 0 var(--ink);
+}
+
+button.chip:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+/* A bigger target than the button looks, since it is small and sits on a moving sprite. */
+button.chip::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+
+button.chip svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The resize grip: an ink corner bracket, with a paper halo so it shows on a dark scene. */
+.grip {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 14px;
+  height: 14px;
+  border-right: 3px solid var(--ink);
+  border-bottom: 3px solid var(--ink);
+  border-bottom-right-radius: 8px;
+  filter: drop-shadow(0 0 1px var(--card)) drop-shadow(0 0 1px var(--card));
+  cursor: nwse-resize;
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.grip::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+}
+
+/* ---- The edit sheet ------------------------------------------------------------ */
+
+.sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  width: min(460px, 100%);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px 16px;
+  background-color: var(--paper);
+  border-left: 2px solid var(--ink);
+  box-shadow: calc(-1 * var(--lift)) 0 0 var(--ink);
+  animation: sheet-in 0.2s ease-out;
+}
+
+.sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0 12px;
+  background-color: var(--paper);
+}
+
+.sheet-head h2 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+/* On a narrow screen it comes up from the bottom instead, and leaves the top of the home
+   screen, with the widget being edited, in view. */
+@media (max-width: 860px) {
+  .sheet {
+    top: auto;
+    left: 0;
+    width: auto;
+    height: min(72vh, 640px);
+    border-left: 0;
+    border-top: 2px solid var(--ink);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 calc(-1 * var(--lift)) 0 var(--ink);
+    animation-name: sheet-up;
+  }
+}
+
+.toast-slot {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 20;
+  transform: translateX(-50%);
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 16px;
+  font-size: 13px;
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.toast button {
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
+  }
+
+  .placed::after,
+  .placed-chrome {
+    transition: none;
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampRect, defaultSize, GAP, MIN_SIZE, nextFreeSpot, type Rect } from './homeScreen';
+import { arrange, clampRect, defaultSize, GAP, MIN_SIZE, nextFreeSpot, type Rect } from './homeScreen';
 
 const overlap = (a: Rect, b: Rect) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
@@ -30,6 +30,28 @@ describe('placing a new widget on the home screen', () => {
   it('still finds a spot on a screen narrower than the widget', () => {
     const spot = nextFreeSpot([{ x: GAP, y: GAP, width: 420, height: 240 }], defaultSize('battle'), 320);
     expect(spot.y).toBeGreaterThanOrEqual(GAP + 240 + GAP);
+  });
+});
+
+describe('drawing the home screen on a narrower tab', () => {
+  const wide: Rect[] = [
+    { x: 24, y: 24, width: 420, height: 240 },
+    { x: 480, y: 24, width: 240, height: 240 },
+  ];
+
+  it('changes nothing when every widget fits', () => {
+    expect(arrange(wide, 1280)).toEqual(wide);
+  });
+
+  it('moves a widget that was pulled in and landed on another', () => {
+    const [first, second] = arrange(wide, 375) as [Rect, Rect];
+    expect(overlap(first, second)).toBe(false);
+    expect(second.x + second.width).toBeLessThanOrEqual(375);
+  });
+
+  it('leaves a widget someone dropped on top of another where they dropped it', () => {
+    const stacked: Rect[] = [wide[0]!, { x: 100, y: 100, width: 240, height: 240 }];
+    expect(arrange(stacked, 1280)).toEqual(stacked);
   });
 });
 

@@ -2,16 +2,19 @@ import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import './styles.css';
 import { loadCatalogs, type Catalogs } from './core/data';
-import { getWidget, onWidgetsChanged, type PlacedWidget } from './core/store';
+import { displayName } from './core/catalog';
+import { getWidget, onWidgetsChanged, requestEdit, type PlacedWidget } from './core/store';
 import { playCry, preloadCry } from './core/audio';
+import { removeFromDesktop, showSettings, startMove, startResize } from './desktop';
 import { WidgetView } from './ui/WidgetView';
+import { usePressOrDrag, WidgetChrome } from './ui/WidgetChrome';
 
 /**
- * A widget on its own, filling whatever window it is in.
+ * A widget on its own, filling the window it is in: what each desktop widget window loads.
  *
- * This is what a desktop widget window loads, and what the browser shows when a widget is
- * opened in its own tab. It follows the same settings the setup app writes, and redraws when
- * they change in another window.
+ * The window has no frame and no background, so all that shows on the desktop is the widget
+ * itself. Dragging it anywhere moves the window, the grip resizes it, and it follows the
+ * settings window's changes as they are made.
  */
 function WidgetWindow({ id }: { id: number }) {
   const [catalogs, setCatalogs] = useState<Catalogs | null>(null);
@@ -28,20 +31,35 @@ function WidgetWindow({ id }: { id: number }) {
     if (widget?.config.cryEnabled) preloadCry(widget.config.pokemonId, widget.config.legacyCry);
   }, [widget?.config.pokemonId, widget?.config.legacyCry, widget?.config.cryEnabled]);
 
+  const press = usePressOrDrag({
+    onTap: () => {
+      if (widget?.config.cryEnabled) void playCry(widget.config.pokemonId, widget.config.legacyCry);
+    },
+    onDragStart: (event) => {
+      // The OS takes the pointer from here and moves the whole window with it.
+      (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(event.pointerId);
+      startMove();
+    },
+  });
+
   if (!catalogs || !widget) return null;
+  const entry = catalogs.entry(widget.config.pokemonId);
+  const name = entry ? displayName(entry) : 'Pokémon';
 
   return (
-    <div
-      data-tauri-drag-region
-      style={{ width: '100vw', height: '100vh', display: 'grid', placeItems: 'center' }}
-    >
-      <WidgetView
-        config={widget.config}
-        catalogs={catalogs}
-        width={size.width}
-        height={size.height}
-        onClick={() => {
-          if (widget.config.cryEnabled) void playCry(widget.config.pokemonId, widget.config.legacyCry);
+    <div class="placed desktop" aria-label={`${name} widget`} {...press} onDragStart={(event) => event.preventDefault()}>
+      <WidgetView config={widget.config} catalogs={catalogs} width={size.width} height={size.height} />
+      <WidgetChrome
+        name={name}
+        removeLabel="Take off the desktop"
+        onEdit={() => {
+          requestEdit(id);
+          void showSettings();
+        }}
+        onRemove={() => void removeFromDesktop(id)}
+        onGripDown={(event) => {
+          event.preventDefault();
+          startResize();
         }}
       />
     </div>

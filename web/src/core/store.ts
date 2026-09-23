@@ -144,6 +144,16 @@ export function rememberWindow(id: number, window: PlacedWidget['window']): void
   write(saved);
 }
 
+/** Puts back a widget that was just removed, with its own id, for an Undo. */
+export function restoreWidget(widget: PlacedWidget): void {
+  const saved = read();
+  if (saved.widgets.some((w) => w.id === widget.id)) return;
+  saved.widgets.push(widget);
+  saved.widgets.sort((a, b) => a.id - b.id);
+  saved.nextId = Math.max(saved.nextId, widget.id + 1);
+  write(saved);
+}
+
 export function placeOnPage(id: number, rect: Rect): void {
   const saved = read();
   const widget = saved.widgets.find((w) => w.id === id);
