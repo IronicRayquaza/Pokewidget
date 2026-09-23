@@ -2,6 +2,23 @@
 
 What changed, written for someone using the app rather than reading the diff.
 
+## Unreleased — desktop and browser widgets (testing, not on main)
+
+Widgets now live where you'd expect them to, instead of in a tab of their own.
+
+<!-- screenshot slot: the browser home screen with a widget or two on it -->
+
+- **In the browser, the tab is the home screen.** Widgets sit right on the page, wherever you
+  drag them, with nothing drawn behind them unless you choose a background. Click one to hear
+  its cry; drag it to move it; pull the corner to resize it. Editing opens a panel beside it
+  instead of a new tab.
+- **On the PC, widgets sit on the desktop**, on your wallpaper and behind your open apps, like a
+  widget on a phone's home screen. No window frame, no taskbar button, no background unless you
+  pick one. Drag one by the Pokémon itself, pull its corner to resize it, and hover it for edit
+  and remove.
+- **They stay put.** Widgets come back after a restart, at the size and place you left them.
+- **A tray icon** keeps PokeWidget running with the settings window closed. Quit it from there.
+
 ## 1.5
 
 Installs over 1.4 and keeps your widgets. Thanks to everyone who sent feedback after the first
