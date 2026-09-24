@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: https://cdn.jsdelivr.net https://raw.githubusercontent.com https://play.pokemonshowdown.com https://veekun.com; connect-src 'self' https://cdn.jsdelivr.net https://raw.githubusercontent.com; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; media-src 'self' https://cdn.jsdelivr.net https://raw.githubusercontent.com"
+      "csp": "default-src 'self'; img-src 'self' data: https://cdn.jsdelivr.net https://raw.githubusercontent.com https://play.pokemonshowdown.com https://veekun.com https://wsrv.nl; connect-src 'self' https://cdn.jsdelivr.net https://raw.githubusercontent.com; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; media-src 'self' https://cdn.jsdelivr.net https://raw.githubusercontent.com"
     },
     "macOSPrivateApi": true
   },

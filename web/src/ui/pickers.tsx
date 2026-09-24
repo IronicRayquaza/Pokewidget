@@ -4,13 +4,15 @@ import {
   covers,
   searchPokemon,
   searchTrainers,
-  spriteUrl,
+  spriteUrls,
   trainerFrontUrl,
   type BattleBackground,
   type SpriteSet,
 } from '../core/catalog';
 import { battleFrame } from '../core/scene';
 import type { WidgetConfig } from '../core/store';
+import { withProxy } from '../core/imageSource';
+import { FallbackImg } from './images';
 
 /** The Pokémon list, searchable and filterable by generation. */
 export function PokemonPicker({
@@ -53,9 +55,9 @@ export function PokemonPicker({
         {results.map((entry) => {
           const set =
             catalogs.setsFor(entry.i).find((s) => s.animated) ?? catalogs.setsFor(entry.i)[0];
-          const url =
-            set &&
-            spriteUrl(catalogs.sets, set, {
+          const urls = !set
+            ? []
+            : spriteUrls(catalogs.sets, set, {
               setId: set.id,
               pokemonId: entry.i,
               shiny: shiny && covers(set, entry.i, false, true, false, null),
@@ -67,7 +69,7 @@ export function PokemonPicker({
               aria-pressed={entry.i === selectedId}
               onClick={() => onSelect(entry.i)}
             >
-              <span class="art">{url && <img src={url} alt="" class="pixel-art" loading="lazy" />}</span>
+              <span class="art">{urls.length > 0 && <FallbackImg urls={withProxy(urls)} alt="" class="pixel-art" loading="lazy" />}</span>
               <span class="name">{entry.n}</span>
               <span class="sub">
                 {entry.f ?? `#${String(entry.d).padStart(3, '0')}`}
@@ -95,14 +97,14 @@ export function SetPicker({
   return (
     <div class="grid wide">
       {sets.map((set) => {
-        const url = spriteUrl(catalogs.sets, set, {
+        const urls = spriteUrls(catalogs.sets, set, {
           setId: set.id,
           pokemonId: config.pokemonId,
           shiny: config.shiny && covers(set, config.pokemonId, false, true, false, null),
         });
         return (
           <button key={set.id} class="tile" aria-pressed={set.id === config.setId} onClick={() => onSelect(set)}>
-            <span class="art">{url && <img src={url} alt="" class="pixel-art" loading="lazy" />}</span>
+            <span class="art">{urls.length > 0 && <FallbackImg urls={withProxy(urls)} alt="" class="pixel-art" loading="lazy" />}</span>
             <span class="name">{set.label}</span>
             <span class="sub">
               {set.hardware}
@@ -164,7 +166,7 @@ export function TrainerPicker({
                 onClick={() => onSelect(trainer.i)}
               >
                 <span class="art" style={{ position: 'relative' }}>
-                  <img src={trainerFrontUrl(catalogs.trainers, trainer)} alt="" class="pixel-art" loading="lazy" />
+                  <FallbackImg urls={withProxy([trainerFrontUrl(catalogs.trainers, trainer)])} alt="" class="pixel-art" loading="lazy" />
                   {trainer.b && (
                     <span class="badge" style={{ position: 'absolute', top: 2, right: 2 }}>
                       BACK
@@ -206,8 +208,8 @@ export function BackgroundPicker({
             onClick={() => onSelect(background)}
           >
             <span class="shot">
-              <img
-                src={background.url}
+              <FallbackImg
+                urls={withProxy([background.url, background.fallbackUrl].filter(Boolean))}
                 alt=""
                 class="pixel-art"
                 loading="lazy"

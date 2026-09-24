@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { Catalogs } from '../core/data';
-import { backgroundById, spriteUrl } from '../core/catalog';
+import { backgroundById, spriteUrls } from '../core/catalog';
+import { withProxy } from '../core/imageSource';
 import { trainerArt, type TrainerArt } from '../core/trainerArt';
 import {
   battleFrame,
@@ -15,6 +16,7 @@ import {
   type Box,
 } from '../core/scene';
 import { effectiveScene, type WidgetConfig } from '../core/store';
+import { FallbackImg, useLoadedImage } from './images';
 
 /**
  * One widget, drawn the way the Android renderer draws it — same layout, same sizes, same
@@ -38,8 +40,8 @@ export function WidgetView({
   onClick?: () => void;
 }) {
   const set = catalogs.set(config.setId);
-  const sprite = set
-    ? spriteUrl(catalogs.sets, set, {
+  const spriteSources = set
+    ? spriteUrls(catalogs.sets, set, {
         setId: set.id,
         pokemonId: config.pokemonId,
         back: config.back,
@@ -47,9 +49,11 @@ export function WidgetView({
         female: config.female,
         style: config.style,
       })
-    : null;
+    : [];
 
-  const natural = useNaturalSize(sprite);
+  // The first host that answers, and the sprite's own pixel size from it.
+  const natural = useLoadedImage(withProxy(spriteSources));
+  const sprite = natural?.src ?? null;
   const trainer = useTrainerArt(catalogs, config);
   const background = backgroundById(catalogs.backgrounds, config.backgroundId);
 
@@ -105,9 +109,9 @@ export function WidgetView({
       }}
     >
       {background && framed && (
-        <img
+        <FallbackImg
           class="layer"
-          src={background.url}
+          urls={withProxy([background.url, background.fallbackUrl].filter(Boolean))}
           alt=""
           style={{
             ...coverStyle(framed.crop, background.w, background.h, width, height),
@@ -151,30 +155,6 @@ function coverStyle(crop: Box, imageW: number, imageH: number, boxW: number, box
     width: `${imageW * scale}px`,
     height: `${imageH * scale}px`,
   };
-}
-
-/** A sprite's own pixel size, which is what every size setting is measured against. */
-function useNaturalSize(src: string | null): { width: number; height: number } | null {
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
-  useEffect(() => {
-    if (!src) {
-      setSize(null);
-      return;
-    }
-    let live = true;
-    const image = new Image();
-    image.onload = () => {
-      if (live) setSize({ width: image.naturalWidth, height: image.naturalHeight });
-    };
-    image.onerror = () => {
-      if (live) setSize(null);
-    };
-    image.src = src;
-    return () => {
-      live = false;
-    };
-  }, [src]);
-  return size;
 }
 
 function useTrainerArt(catalogs: Catalogs, config: WidgetConfig): TrainerArt | null {
