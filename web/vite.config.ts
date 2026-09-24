@@ -1,13 +1,13 @@
 import { defineConfig } from 'vite';
 // Adjust this plugin import based on your actual framework (e.g., @vitejs/plugin-vue for Vue, @sveltejs/vite-plugin-svelte for Svelte)
-import react from '@vitejs/plugin-react'; // Assuming React based on common usage
+import preact from '@preact/preset-vite'; // Correctly use the Preact plugin
 import path from 'path';
 
 export default defineConfig({
   plugins: [
     // Ensure your framework plugin is listed here.
     // For example:
-    react(),
+    preact(), // Use the Preact plugin
     // Add other plugins if you have them
   ],
   resolve: {
