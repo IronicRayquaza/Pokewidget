@@ -55,9 +55,17 @@ cannot drift:
 | `cdn.jsdelivr.net` | Pokémon sprites, cries, trainer back sprites, backgrounds | Sends CORS headers, so pixels and audio can be read |
 | `play.pokemonshowdown.com` | Trainer front sprites | No CORS: only ever displayed, never read |
 | `veekun.com` | Emerald and Gen 4 animation | No CORS: displayed only |
+| `wsrv.nl` | Any of the above, as a last resort | An image proxy, only used when a file's own host fails |
 
 That is why trainer *backs* can be sliced and recoloured in a canvas but fronts cannot — and
 they need no processing anyway.
+
+Some networks cannot reach every host. A firewall that inspects HTTPS (a Fortinet on a school
+or office network, for one) re-signs play.pokemonshowdown.com and veekun.com with a
+certificate the computer does not trust, so every trainer front and the Gen 3–4 veekun sets
+fail while jsDelivr works. `src/core/imageSource.ts` therefore gives every image the wsrv.nl
+proxy as a last resort, and once the proxy has worked for a host that failed, tries it first
+for that host for the rest of the session.
 
 ## Known limits
 
@@ -69,6 +77,8 @@ they need no processing anyway.
 - **A desktop widget's whole window catches the mouse**, including the see-through space around
   the sprite, so desktop icons under that space cannot be clicked. Keep widgets clear of icons,
   or size them snugly.
+- **Widgets on top of everything cover what is under their whole window**, see-through space
+  included, so size a pinned widget snugly.
 - **Always-on-bottom has only been checked on Windows.** macOS and Linux get the same window
   option, but how their window managers treat it has not been tried yet.
 - **Transparent windows on macOS** need `macOSPrivateApi`, which the config turns on. That is

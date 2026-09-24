@@ -16,6 +16,12 @@ Widgets now live where you'd expect them to, instead of in a tab of their own.
   widget on a phone's home screen. No window frame, no taskbar button, no background unless you
   pick one. Drag one by the Pokémon itself, pull its corner to resize it, and hover it for edit
   and remove.
+- **On the desktop, or on top of everything — your choice, per widget.** Pin a widget from
+  its hover controls (or in settings) and it floats above every window while you work; unpin
+  it and it goes back down onto the wallpaper.
+- **Sprites load on restrictive networks.** Trainer sprites and the Emerald, Diamond/Pearl,
+  Platinum and HeartGold/SoulSilver sets failed on networks whose firewall blocks their hosts;
+  they now come through another route when that happens.
 - **They stay put.** Widgets come back after a restart, at the size and place you left them.
 - **A tray icon** keeps PokeWidget running with the settings window closed. Quit it from there.
 
