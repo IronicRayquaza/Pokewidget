@@ -8,6 +8,7 @@ import {
   onEditRequested,
   onWidgetsChanged,
   removeWidget,
+  setOnTop,
   updateWidget,
   type PlacedWidget,
   type WidgetConfig,
@@ -62,6 +63,13 @@ export function DesktopSettings({ catalogs }: { catalogs: Catalogs }) {
     if (widget.onDesktop) await removeFromDesktop(widget.id);
     else await placeOnDesktop(widget.id);
     refresh();
+  };
+
+  // The widget's own window follows the change through the storage event it listens for.
+  const setLayer = (widget: PlacedWidget, onTop: boolean) => {
+    setOnTop(widget.id, onTop);
+    refresh();
+    announceChange();
   };
 
   return (
@@ -120,6 +128,34 @@ export function DesktopSettings({ catalogs }: { catalogs: Catalogs }) {
           )}
 
           {selected && (
+            <div class="card">
+              <p class="section-title">Desktop</p>
+              <div class="row">
+                <button
+                  class={selected.onDesktop ? undefined : 'primary'}
+                  onClick={() => void toggleDesktop(selected)}
+                >
+                  {selected.onDesktop ? 'Take off the desktop' : 'Put on the desktop'}
+                </button>
+              </div>
+              <label class="field">Sits</label>
+              <div class="row">
+                <button aria-pressed={!selected.onTop} onClick={() => setLayer(selected, false)}>
+                  On the desktop
+                </button>
+                <button aria-pressed={Boolean(selected.onTop)} onClick={() => setLayer(selected, true)}>
+                  On top of everything
+                </button>
+              </div>
+              <p class="caption">
+                {selected.onTop
+                  ? 'Floats above every window, so it stays in view while you work. Its pin switches it back.'
+                  : 'On your wallpaper, under your open apps, like a widget on a phone’s home screen.'}
+              </p>
+            </div>
+          )}
+
+          {selected && (
             <Editor
               key={selected.id}
               catalogs={catalogs}
@@ -128,14 +164,6 @@ export function DesktopSettings({ catalogs }: { catalogs: Catalogs }) {
               setPanel={setPanel}
               change={change}
               showPreview
-              actions={
-                <button
-                  class={selected.onDesktop ? undefined : 'primary'}
-                  onClick={() => void toggleDesktop(selected)}
-                >
-                  {selected.onDesktop ? 'Take off the desktop' : 'Put on the desktop'}
-                </button>
-              }
               onRemove={async () => {
                 await removeFromDesktop(selected.id);
                 removeWidget(selected.id);

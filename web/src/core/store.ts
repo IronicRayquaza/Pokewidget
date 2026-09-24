@@ -45,6 +45,11 @@ export interface PlacedWidget {
   page?: Rect;
   /** Desktop only: the widget is out on the desktop, and goes back there after a restart. */
   onDesktop?: boolean;
+  /**
+   * Desktop only: float above every window instead of sitting on the wallpaper under them.
+   * Off unless chosen, so a widget put out on the desktop behaves like a home-screen one.
+   */
+  onTop?: boolean;
 }
 
 export const DEFAULT_CONFIG: WidgetConfig = {
@@ -167,6 +172,14 @@ export function setOnDesktop(id: number, on: boolean): void {
   const widget = saved.widgets.find((w) => w.id === id);
   if (!widget) return;
   widget.onDesktop = on;
+  write(saved);
+}
+
+export function setOnTop(id: number, on: boolean): void {
+  const saved = read();
+  const widget = saved.widgets.find((w) => w.id === id);
+  if (!widget) return;
+  widget.onTop = on;
   write(saved);
 }
 

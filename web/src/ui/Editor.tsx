@@ -1,4 +1,3 @@
-import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { Catalogs } from '../core/data';
 import { covers, defaultBackground, defaultTrainer, displayName, shinyAvailability, type SpriteSet } from '../core/catalog';
@@ -19,7 +18,6 @@ export function Editor({
   change,
   onRemove,
   showPreview,
-  actions,
 }: {
   catalogs: Catalogs;
   widget: PlacedWidget;
@@ -29,8 +27,6 @@ export function Editor({
   onRemove: () => void;
   /** The browser tab has none: the widget on the home screen is already the live preview. */
   showPreview: boolean;
-  /** Whatever puts the widget somewhere, at the end of the first row. */
-  actions?: ComponentChildren;
 }) {
   const config = widget.config;
   const set = catalogs.set(config.setId);
@@ -117,12 +113,6 @@ export function Editor({
           <button aria-pressed={config.cryEnabled} onClick={() => change({ cryEnabled: !config.cryEnabled })}>
             Cry on click
           </button>
-          {actions && (
-            <>
-              <span style={{ flex: 1 }} />
-              {actions}
-            </>
-          )}
         </div>
         {notice && <p class="caption">{notice}</p>}
       </div>

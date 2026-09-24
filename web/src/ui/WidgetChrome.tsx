@@ -94,7 +94,8 @@ export function usePressOrDrag({
 
 /**
  * The controls a widget shows only while it is hovered, focused or being edited: edit,
- * remove, and a grip in the corner to resize by. The rest of the time a widget has no
+ * remove, and a grip in the corner to resize by. A desktop widget also gets a pin, to float
+ * it above every window or put it back down on the desktop. The rest of the time a widget has no
  * chrome at all, like one on a phone.
  */
 export function WidgetChrome({
@@ -103,18 +104,37 @@ export function WidgetChrome({
   onEdit,
   onRemove,
   onGripDown,
+  pinned,
+  onPin,
 }: {
   name: string;
   removeLabel: string;
   onEdit: () => void;
   onRemove: () => void;
   onGripDown: (event: PointerEvent) => void;
+  /** Desktop only: whether the widget floats above every window. */
+  pinned?: boolean;
+  onPin?: () => void;
 }) {
   // A press on a control must not also start moving the widget underneath it.
   const stop = (event: Event) => event.stopPropagation();
   return (
     <div class="placed-chrome">
       <div class="placed-actions">
+        {onPin && (
+          <button
+            class="chip"
+            aria-pressed={pinned}
+            aria-label={`Keep ${name} on top of other windows`}
+            title={pinned ? 'On top of everything · click to put it back on the desktop' : 'Keep on top of other windows'}
+            onPointerDown={stop}
+            onClick={onPin}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M6 2h4M7 2v4L4.5 9h7L9 6V2M8 9v5" />
+            </svg>
+          </button>
+        )}
         <button class="chip" aria-label={`Edit ${name}`} title="Edit" onPointerDown={stop} onClick={onEdit}>
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M10.5 2.5l3 3L6 13H3v-3z" />

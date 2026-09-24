@@ -3,9 +3,9 @@ import { useEffect, useState } from 'preact/hooks';
 import './styles.css';
 import { loadCatalogs, type Catalogs } from './core/data';
 import { displayName } from './core/catalog';
-import { getWidget, onWidgetsChanged, requestEdit, type PlacedWidget } from './core/store';
+import { announceChange, getWidget, onWidgetsChanged, requestEdit, setOnTop, type PlacedWidget } from './core/store';
 import { playCry, preloadCry } from './core/audio';
-import { removeFromDesktop, showSettings, sinkToDesktop, startMove, startResize } from './desktop';
+import { applyLayer, removeFromDesktop, showSettings, startMove, startResize } from './desktop';
 import { WidgetView } from './ui/WidgetView';
 import { usePressOrDrag, WidgetChrome } from './ui/WidgetChrome';
 
@@ -22,11 +22,17 @@ function WidgetWindow({ id }: { id: number }) {
   const size = useWindowSize();
 
   useEffect(() => {
-    sinkToDesktop();
     loadCatalogs().then(setCatalogs).catch(() => setCatalogs(null));
   }, []);
 
   useEffect(() => onWidgetsChanged(() => setWidget(getWidget(id))), [id]);
+
+  // On top of every window, or down on the desktop: set when the page loads, and again
+  // whenever it is changed, here or in the settings window.
+  const onTop = Boolean(widget?.onTop);
+  useEffect(() => {
+    void applyLayer(onTop);
+  }, [onTop]);
 
   useEffect(() => {
     if (widget?.config.cryEnabled) preloadCry(widget.config.pokemonId, widget.config.legacyCry);
@@ -58,6 +64,11 @@ function WidgetWindow({ id }: { id: number }) {
           void showSettings();
         }}
         onRemove={() => void removeFromDesktop(id)}
+        pinned={onTop}
+        onPin={() => {
+          setOnTop(id, !onTop);
+          announceChange();
+        }}
         onGripDown={(event) => {
           event.preventDefault();
           startResize();

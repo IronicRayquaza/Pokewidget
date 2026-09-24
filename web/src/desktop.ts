@@ -5,7 +5,7 @@
  * the browser build puts widgets on its own tab instead. Nothing else in the app has to know
  * which it is running in.
  */
-import { listWidgets, setOnDesktop } from './core/store';
+import { getWidget, listWidgets, setOnDesktop } from './core/store';
 
 type ResizeDirection = 'SouthEast';
 
@@ -18,6 +18,7 @@ interface TauriWindow {
   startDragging(): Promise<void>;
   startResizeDragging(direction: ResizeDirection): Promise<void>;
   setAlwaysOnBottom(onBottom: boolean): Promise<void>;
+  setAlwaysOnTop(onTop: boolean): Promise<void>;
 }
 
 interface TauriApi {
@@ -41,7 +42,8 @@ const FIRST_SIZE = { width: 240, height: 240 };
 
 /**
  * Puts a widget on the desktop: a window with no frame, no background, no taskbar button, that
- * sits on the wallpaper behind every app like a widget on a phone's home screen.
+ * sits on the wallpaper behind every app like a widget on a phone's home screen — or, if it
+ * was set to, floats on top of every app instead.
  *
  * Asking twice only brings the existing window back: a second window with the same label is
  * an error in Tauri, and one widget should never be on the desktop twice.
@@ -55,6 +57,7 @@ export async function placeOnDesktop(id: number): Promise<void> {
     await existing.show();
     return;
   }
+  const onTop = Boolean(getWidget(id)?.onTop);
   new api.WebviewWindow(labelFor(id), {
     url: `widget.html?id=${id}`,
     ...FIRST_SIZE,
@@ -65,7 +68,8 @@ export async function placeOnDesktop(id: number): Promise<void> {
     transparent: true,
     shadow: false,
     skipTaskbar: true,
-    alwaysOnBottom: true,
+    alwaysOnBottom: !onTop,
+    alwaysOnTop: onTop,
     focus: false,
     title: 'PokéWidget',
   });
@@ -107,8 +111,19 @@ export const startMove = (): void => void current()?.startDragging();
 export const startResize = (): void => void current()?.startResizeDragging('SouthEast');
 
 /**
- * Sends this window down onto the desktop. The window is created "always on bottom", but on
- * Windows that only takes hold at its next move: a new window still opens above the apps.
- * Asking once more when the widget page loads puts it straight down under them.
+ * Puts this widget window in its layer: on top of every app, or down on the desktop under them.
+ *
+ * Both flags are cleared before the wanted one is set, every time. On Windows, tao only moves a
+ * window when a flag actually changes, and a window created "always on bottom" still opens
+ * above the apps: asking for the flag it already has would do nothing. Clearing first makes
+ * the last call a real change, so the window really goes where it is asked to. It runs when
+ * the widget page loads as well as whenever the setting changes.
  */
-export const sinkToDesktop = (): void => void current()?.setAlwaysOnBottom(true);
+export async function applyLayer(onTop: boolean): Promise<void> {
+  const window = current();
+  if (!window) return;
+  await window.setAlwaysOnTop(false);
+  await window.setAlwaysOnBottom(false);
+  if (onTop) await window.setAlwaysOnTop(true);
+  else await window.setAlwaysOnBottom(true);
+}
