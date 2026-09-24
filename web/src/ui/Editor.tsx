@@ -3,10 +3,27 @@ import type { Catalogs } from '../core/data';
 import { covers, defaultBackground, defaultTrainer, displayName, shinyAvailability, type SpriteSet } from '../core/catalog';
 import { effectiveScene, type PlacedWidget, type WidgetConfig } from '../core/store';
 import { playCry, preloadCry } from '../core/audio';
+import { ANIMATED_IN_ROM_ONLY, IDLE_STYLE_ORDER, IDLE_STYLES, isRendered } from '../core/idle';
 import { WidgetView } from './WidgetView';
 import { BackgroundPicker, PokemonPicker, SetPicker, TrainerPicker } from './pickers';
 
 export type Panel = 'pokemon' | 'set' | 'trainer' | null;
+
+/**
+ * Why this set does not move on its own. There is no single answer, which is the point: a port
+ * of `stillSetExplanation` in the Android app's ConfigScreen.kt.
+ */
+function stillSetExplanation(set: SpriteSet | undefined, available: SpriteSet[]): string {
+  if (!set) return 'This set ships as still images, so PokéWidget adds the movement.';
+  // Several games are in twice, a still dump and an animated one; the real thing is a tap away.
+  const animated = available.find((s) => s.animated && s.game === set.game && s.id !== set.id);
+  if (animated) return `${set.game}’s real animation is in the “${animated.label}” set — pick that one for the genuine article.`;
+  if (isRendered(set.id))
+    return `${set.game} animates a 3D model rather than a sprite, so there is no 2D animation to fetch — PokéWidget adds the movement instead.`;
+  if (ANIMATED_IN_ROM_ONLY.has(set.id))
+    return `${set.game} does animate its sprites, but that animation only exists inside the cartridge — nobody has published a dump of it, so PokéWidget generates the movement instead.`;
+  return `${set.game} never animated its sprites — this is exactly what the game drew, and the movement is PokéWidget’s.`;
+}
 
 const SWATCHES = ['#1b1f27', '#ffffff', '#2e4b12', '#30435e', '#5b2333', '#00000066'];
 
@@ -180,6 +197,25 @@ export function Editor({
               }
             />
           </div>
+        )}
+
+        {/* Only for still art: against an animated set the choice would change nothing. */}
+        {set && !set.animated && (
+          <>
+            <p class="section-title" style={{ marginTop: 18 }}>
+              Idle movement
+            </p>
+            <div class="row">
+              {IDLE_STYLE_ORDER.map((style) => (
+                <button key={style} aria-pressed={config.idleStyle === style} onClick={() => change({ idleStyle: style })}>
+                  {IDLE_STYLES[style].label}
+                </button>
+              ))}
+            </div>
+            <p class="caption">
+              {IDLE_STYLES[config.idleStyle].description}. {stillSetExplanation(set, catalogs.setsFor(config.pokemonId))}
+            </p>
+          </>
         )}
       </div>
 

@@ -19,6 +19,10 @@ Widgets now live where you'd expect them to, instead of in a tab of their own.
 - **On the desktop, or on top of everything — your choice, per widget.** Pin a widget from
   its hover controls (or in settings) and it floats above every window while you work; unpin
   it and it goes back down onto the wallpaper.
+- **Still sprites move, as on your phone.** Emerald, FireRed/LeafGreen, Gen 4 and everything
+  from Gen 6 on now get the same idle movement as the Android widget — Bob, Breathe, Sway,
+  Hover, Swell, or Auto, which picks a breath for pixel art and a swell for 3D renders. Choose
+  it under Idle movement; if your computer is set to reduce motion, they stay still.
 - **Sprites load on restrictive networks.** Trainer sprites and the Emerald, Diamond/Pearl,
   Platinum and HeartGold/SoulSilver sets failed on networks whose firewall blocks their hosts;
   they now come through another route when that happens.

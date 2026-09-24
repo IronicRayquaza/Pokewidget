@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Catalogs } from '../core/data';
 import { backgroundById, spriteUrls } from '../core/catalog';
 import { withProxy } from '../core/imageSource';
+import { IDLE_STYLES, idleFrames, idleReach, resolveIdle, type IdleFrame } from '../core/idle';
 import { trainerArt, type TrainerArt } from '../core/trainerArt';
 import {
   battleFrame,
@@ -63,16 +64,30 @@ export function WidgetView({
   const places = layout(scene, config.trainerSide, width, height, stage);
   const mirrorScene = scene === 'battle' && config.trainerSide === 'right';
 
-  const spriteBox = (() => {
-    if (!natural) return null;
-    const scale = displayScale(
-      natural.width,
-      natural.height,
+  // A still set moves by itself: the generated idle loop, as on the Android widget.
+  const idle = set && !set.animated ? idleFrames(config.idleStyle, set.id) : null;
+  const idleInterval = set ? IDLE_STYLES[resolveIdle(config.idleStyle, set.id)].intervalMs : 0;
+
+  const spriteScale = (() => {
+    if (!natural) return 0;
+    // Leave room for the widest pose, so a breath does not clip at a snug widget's edges.
+    const reach = idle ? idleReach(idle) : { widest: 1, tallest: 1 };
+    return displayScale(
+      Math.max(1, Math.round(natural.width * reach.widest)),
+      Math.max(1, Math.round(natural.height * reach.tallest)),
       places.pokemon.width,
       places.pokemon.height,
       FILL_MULTIPLE[config.fill],
       config.fill === 'true-size' ? set?.referencePx ?? null : null,
     );
+  })();
+
+  const spriteRef = useRef<HTMLImageElement>(null);
+  useIdleLoop(spriteRef, sprite, idle, idleInterval, spriteScale, config.flipHorizontal);
+
+  const spriteBox = (() => {
+    if (!natural) return null;
+    const scale = spriteScale;
     return fit(
       Math.round(natural.width * scale),
       Math.round(natural.height * scale),
@@ -124,12 +139,15 @@ export function WidgetView({
 
       {sprite && spriteBox && (
         <img
+          ref={spriteRef}
           class="layer sprite"
           src={sprite}
           alt={catalogs.entry(config.pokemonId)?.n ?? 'Pokémon'}
           style={{
             ...boxStyle(spriteBox),
             transform: config.flipHorizontal ? 'scaleX(-1)' : undefined,
+            // A squash is about the feet, so the sprite settles rather than shrinks.
+            transformOrigin: '50% 100%',
           }}
         />
       )}
@@ -155,6 +173,45 @@ function coverStyle(crop: Box, imageW: number, imageH: number, boxW: number, box
     width: `${imageW * scale}px`,
     height: `${imageH * scale}px`,
   };
+}
+
+/**
+ * Runs a still sprite's idle loop on its image.
+ *
+ * Stepped, not tweened: every pose is held for `intervalMs` and then jumps to the next, as the
+ * Android widget's flipper does. Offsets are in the sprite's own pixels, multiplied by how much
+ * it is scaled up, so the motion keeps its proportions at every size. Someone who has asked
+ * their system for less motion gets the still sprite.
+ */
+function useIdleLoop(
+  ref: { current: HTMLImageElement | null },
+  /** The image being shown; the loop starts once it is on the page, and again if it changes. */
+  src: string | null,
+  frames: IdleFrame[] | null,
+  intervalMs: number,
+  pxPerSourcePx: number,
+  mirrored: boolean,
+) {
+  const key = frames ? JSON.stringify(frames) : '';
+  useEffect(() => {
+    const image = ref.current;
+    if (!image || !frames || frames.length < 2 || !pxPerSourcePx || typeof image.animate !== 'function') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    // A mirrored sprite sways the other way, so it still leans into its own motion.
+    const sign = mirrored ? -1 : 1;
+    const pose = (f: IdleFrame) =>
+      `translate(${Math.round(f.dxSource * pxPerSourcePx) * sign}px, ${Math.round(f.dySource * pxPerSourcePx)}px) ` +
+      `scale(${(f.scaleXPermille / 1000) * sign}, ${f.scaleYPermille / 1000})`;
+    const n = frames.length;
+    const keyframes = [...frames, frames[0]!].map((f, i) => ({ offset: i / n, transform: pose(f) }));
+    const animation = image.animate(keyframes, {
+      duration: n * intervalMs,
+      iterations: Infinity,
+      // n held poses: progress only ever lands exactly on a keyframe.
+      easing: `steps(${n}, jump-end)`,
+    });
+    return () => animation.cancel();
+  }, [src, key, intervalMs, pxPerSourcePx, mirrored]);
 }
 
 function useTrainerArt(catalogs: Catalogs, config: WidgetConfig): TrainerArt | null {

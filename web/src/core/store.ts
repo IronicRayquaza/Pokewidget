@@ -1,4 +1,5 @@
 import type { FillMode, Scene, TrainerSide } from './scene';
+import { DEFAULT_IDLE, type IdleStyle } from './idle';
 import type { Rect } from './homeScreen';
 
 export type { Rect };
@@ -32,6 +33,8 @@ export interface WidgetConfig {
   scene: Scene;
 
   fill: FillMode;
+  /** How a still sprite moves; sets with real animation ignore it. See `idle.ts`. */
+  idleStyle: IdleStyle;
   cryEnabled: boolean;
   legacyCry: boolean;
 }
@@ -70,6 +73,7 @@ export const DEFAULT_CONFIG: WidgetConfig = {
   trainerFlip: false,
   scene: 'solo',
   fill: 'fit',
+  idleStyle: DEFAULT_IDLE,
   cryEnabled: true,
   legacyCry: true,
 };
