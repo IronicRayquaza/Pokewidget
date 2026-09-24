@@ -1,0 +1,6 @@
+# The site in docs/app is built from web/*.html and committed, and CI rebuilds it on Linux to
+# check it is current. Keeping both in LF everywhere means a build on Windows produces the very
+# same bytes, instead of CRLF copies that CI reads as a stale site.
+web/*.html text eol=lf
+docs/app/** text eol=lf
+docs/app/**/*.png binary
