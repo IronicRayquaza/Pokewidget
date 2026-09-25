@@ -6,5 +6,6 @@
     <string name="widget_small">Pokémon sprite (small)</string>
     <string name="widget_medium">Pokémon sprite (medium)</string>
     <string name="widget_large">Pokémon sprite (large)</string>
+    <string name="widget_cover">Pokémon sprite (cover screen)</string>
     <string name="widget_loading">Loading sprite</string>
 </resources>

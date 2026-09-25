@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Galaxy Z Flip's cover screen (Samsung calls it the Flex Window). A cover-screen widget
+  is a keyguard widget that Samsung's own meta-data (samsung_widget_cover.xml) puts on the
+  sub screen, and it is sized to fill it: 352 x 339 dp is the widget area Samsung's Flex
+  Window codelab uses, on a 720 x 748 panel (Flip5 and Flip6 alike).
+
+  Keyguard only, so the home-screen widget picker is unchanged: this one is offered under
+  Settings > Cover screen > Widgets, nowhere else.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="com.pokewidgets.app.ui.WidgetConfigActivity"
+    android:initialLayout="@layout/widget_initial"
+    android:initialKeyguardLayout="@layout/widget_initial"
+    android:minHeight="339dp"
+    android:minResizeHeight="40dp"
+    android:minResizeWidth="40dp"
+    android:minWidth="352dp"
+    android:previewImage="@drawable/widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="keyguard" />

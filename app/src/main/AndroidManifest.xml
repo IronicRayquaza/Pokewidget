@@ -92,6 +92,30 @@
                 android:resource="@xml/widget_large" />
         </receiver>
 
+        <!--
+            The Galaxy Z Flip's cover screen. Samsung lists a widget there when it is a keyguard
+            widget and carries com.samsung.android.appwidget.provider pointing at
+            display="sub_screen"; it is then switched on in Settings > Cover screen > Widgets.
+            Other phones ignore the Samsung meta-data and have no keyguard widget host, so this
+            receiver is simply never offered on them.
+        -->
+        <receiver
+            android:name=".widget.PokemonWidgetProvider$Cover"
+            android:exported="true"
+            android:label="@string/widget_cover">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.pokewidgets.app.ACTION_TAP" />
+                <action android:name="com.pokewidgets.app.ACTION_PINNED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_cover" />
+            <meta-data
+                android:name="com.samsung.android.appwidget.provider"
+                android:resource="@xml/samsung_widget_cover" />
+        </receiver>
+
     </application>
 
 </manifest>

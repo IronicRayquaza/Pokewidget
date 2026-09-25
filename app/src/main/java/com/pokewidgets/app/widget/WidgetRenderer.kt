@@ -2,10 +2,12 @@ package com.pokewidgets.app.widget
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.hardware.display.DisplayManager
 import android.os.Bundle
 import android.util.DisplayMetrics
 import android.util.Log
@@ -270,10 +272,13 @@ class WidgetRenderer(private val context: Context) {
         options: Bundle?,
         budgetScale: Double,
     ): RemoteViews {
-        val metrics = context.resources.displayMetrics
+        // Sizes come from the screen the widget is on; the memory budget stays the main
+        // screen's, because that is the ceiling the system enforces for every host.
+        val metrics = hostMetrics(widgetId, options)
+        val mainMetrics = context.resources.displayMetrics
         val (boxW, boxH) = contentBoxPx(options, metrics)
         val budget = (
-            FramePlanner.budgetFor(metrics.widthPixels, metrics.heightPixels) * budgetScale
+            FramePlanner.budgetFor(mainMetrics.widthPixels, mainMetrics.heightPixels) * budgetScale
             ).toLong().coerceAtLeast(MIN_BUDGET)
         // Whatever the extras cost comes out of what the sprite may spend.
         var spriteBudget = budget
@@ -642,6 +647,38 @@ class WidgetRenderer(private val context: Context) {
     }
 
     /**
+     * The display metrics of the screen this widget is actually drawn on.
+     *
+     * A widget reports its size in dp, and dp only turn into the right number of pixels with
+     * the density of the screen showing them. On a Galaxy Z Flip the cover screen (Flex
+     * Window) is a 720 x 748 panel with a lower density than the main one, so converting a
+     * cover widget's dp with the main screen's density drew every frame about 1.7x the pixels
+     * it needed, which the frame planner then paid for in fewer, smaller frames.
+     *
+     * A widget is on the cover screen when it came from the cover provider, or when its host
+     * says it is a keyguard (lock/cover screen) host. Samsung numbers that display 1, the id
+     * its Flex Window docs launch activities onto. Anything else, or any failure to find it,
+     * keeps the main screen's metrics, which is what every other widget has always used.
+     */
+    private fun hostMetrics(widgetId: Int, options: Bundle?): DisplayMetrics {
+        val main = context.resources.displayMetrics
+        val fromCoverProvider = runCatching {
+            AppWidgetManager.getInstance(context).getAppWidgetInfo(widgetId)?.provider?.className ==
+                PokemonWidgetProvider.Cover::class.java.name
+        }.getOrDefault(false)
+        val keyguardHost = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_HOST_CATEGORY, 0) ==
+            AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD
+        if (!fromCoverProvider && !keyguardHost) return main
+
+        val cover = runCatching {
+            context.getSystemService(DisplayManager::class.java)?.getDisplay(SAMSUNG_COVER_DISPLAY_ID)
+        }.getOrNull() ?: return main.also { Log.d(TAG, "cover widget $widgetId: no cover display, using main metrics") }
+        val metrics = runCatching { context.createDisplayContext(cover).resources.displayMetrics }.getOrNull() ?: return main
+        Log.d(TAG, "cover widget $widgetId: ${metrics.widthPixels}x${metrics.heightPixels} px at density ${metrics.density}")
+        return metrics
+    }
+
+    /**
      * The launcher reports the widget's size in dp, and only as a min/max pair. Take the
      * larger figure for each axis so the sprite is planned for the space it will actually
      * occupy in the current orientation.
@@ -672,6 +709,9 @@ class WidgetRenderer(private val context: Context) {
     companion object {
         private const val TAG = "WidgetRenderer"
         private const val DEFAULT_BOX_DP = 110
+
+        /** The Galaxy Z Flip's cover screen, as Samsung's Flex Window documentation numbers it. */
+        private const val SAMSUNG_COVER_DISPLAY_ID = 1
         private const val MIN_BUDGET = 512L * 1024
 
         /** A battle background never needs more than this; it is stretched, not studied. */
@@ -683,6 +723,7 @@ class WidgetRenderer(private val context: Context) {
             ComponentName(context, PokemonWidgetProvider.Small::class.java),
             ComponentName(context, PokemonWidgetProvider.Medium::class.java),
             ComponentName(context, PokemonWidgetProvider.Large::class.java),
+            ComponentName(context, PokemonWidgetProvider.Cover::class.java),
         )
 
         fun allWidgetIds(context: Context): IntArray {

@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Samsung's switch that puts a keyguard widget on the Flex Window (the cover screen). -->
+<samsung-appwidget-provider display="sub_screen" />

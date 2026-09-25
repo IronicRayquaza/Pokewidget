@@ -19,15 +19,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Three concrete providers so the launcher's widget picker offers size presets. They
- * share every behaviour; only the `appwidget-provider` XML differs, and all three are
- * freely resizable afterwards.
+ * Three concrete providers so the launcher's widget picker offers size presets, and a fourth
+ * for the Galaxy Z Flip's cover screen. They share every behaviour; only the
+ * `appwidget-provider` XML differs, and all of them are freely resizable afterwards.
  */
 sealed class PokemonWidgetProvider : AppWidgetProvider() {
 
     class Small : PokemonWidgetProvider()
     class Medium : PokemonWidgetProvider()
     class Large : PokemonWidgetProvider()
+
+    /** The Galaxy Z Flip's cover screen (Flex Window); see `res/xml/widget_cover.xml`. */
+    class Cover : PokemonWidgetProvider()
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, widgetIds: IntArray) {
         // goAsync() is safe here: AppWidgetProvider dispatches onUpdate synchronously
