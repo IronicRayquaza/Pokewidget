@@ -29,6 +29,9 @@ cannot drift:
 | `src/core/scene.ts` | `widget/SceneLayout.kt`, `FramePlanner.displayScale` |
 | `src/core/trainerArt.ts` | `sprite/TrainerArt.kt` |
 | `src/core/audio.ts` | `widget/CryPlayer.kt` |
+| `src/core/tap.ts` | `widget/PokemonWidgetProvider.runTap`, `catalog/SurprisePicker.kt` |
+| `src/core/formRules.ts` | `catalog/FormRules.kt` |
+| `src/core/placeQuery.ts`, `weather.ts` | `data/PlaceQuery.kt`, `WorldClock.kt`, `WeatherSource.kt` |
 
 `src/core/*.test.ts` checks the ports against the real catalogs, the way the Kotlin tests do.
 
@@ -42,6 +45,43 @@ cannot drift:
   drawn at the size the settings ask for.
 - **No opaque-bounds crop.** Sizes are measured from the sprite's own canvas rather than its
   opaque pixels, because most sprite hosts do not allow reading pixels back.
+- **"Get excited" hops instead of speeding up.** A browser has no way to change a GIF's frame
+  rate, so the sprite does three small hops (none at all under reduced motion) with its cry.
+- **"Use my location" is named by its coordinates.** There is no free reverse geocoder without
+  a key, so a located place reads "Near 37.55°, −77.46°" rather than a city name. Search by name
+  works everywhere and gives a proper label.
+
+## Test builds for Windows, macOS and Linux
+
+Nothing is released from here. To get installers for testers, run the **desktop** workflow by
+hand (Actions → desktop → Run workflow, or `gh workflow run desktop.yml --ref <branch>`). Each
+run uploads three artifacts — a Windows `.exe` installer, a universal macOS `.dmg` and a Linux
+AppImage — kept for 14 days and downloadable from the run page by anyone signed in to GitHub
+with access to the repo. No tag, release or draft release is created.
+
+### For Mac testers
+
+The `.dmg` is a universal build: the same file runs on Apple Silicon (M1 and later) and on Intel
+Macs, on macOS 10.15 or newer.
+
+It is not signed by Apple, so macOS will refuse it the first time — usually saying the app "is
+damaged and can't be opened" or that Apple "could not verify" it. That is Gatekeeper reacting
+to any unsigned download, not a fault in the file. After dragging PokeWidget into Applications,
+either:
+
+- open Terminal and run `xattr -cr /Applications/PokeWidget.app`, then open it normally; or
+- try to open it once, then go to System Settings → Privacy & Security and click
+  **Open Anyway** next to the message about PokeWidget.
+
+Only needed once per installed version.
+
+"Use my location" asks for permission the first time it is clicked. If macOS never asks, or it
+fails, search for the city by name instead — that path needs no permission at all.
+
+Removing the warning for good means signing and notarising the app: an Apple Developer account
+(US$99 a year), a Developer ID certificate, and four repository secrets (`APPLE_CERTIFICATE`,
+`APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID` / `APPLE_PASSWORD` or an API key, and
+`APPLE_TEAM_ID`) that Tauri reads during `tauri build`. Not set up yet.
 
 ## Hosts and what each allows
 
