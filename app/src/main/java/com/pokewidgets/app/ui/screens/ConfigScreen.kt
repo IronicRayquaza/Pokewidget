@@ -502,10 +502,14 @@ private fun LiveFormSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> W
                         "Set a city in Settings and the widget will follow its weather. " +
                             "Until then it follows the clock only."
                     } else {
-                        "Following the weather in ${state.weatherPlace}. The widget keeps " +
-                            "the Pokémon you chose — only its form changes."
+                        "Following the weather and time of day in ${state.weatherPlace}. The " +
+                            "widget keeps the Pokémon you chose — only its form changes."
                     },
                 )
+                if (state.liveFormNow != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Caption("Right now: ${state.liveFormNow}")
+                }
             }
         }
     }

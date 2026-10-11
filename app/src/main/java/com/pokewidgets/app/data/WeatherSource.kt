@@ -31,8 +31,19 @@ import java.util.Calendar
 /** A place the user chose to take the weather from. */
 data class Place(val label: String, val latitude: Double, val longitude: Double)
 
-/** A weather reading, and when it was taken. */
-data class Reading(val weather: Weather, val isDay: Boolean, val takenAtMs: Long)
+/**
+ * A weather reading, and when it was taken.
+ *
+ * [utcOffsetSec] and [sun] are the place's own clock — see [WorldClock]. Both are absent on a
+ * reading stored by 1.5, which then behaves exactly as it did.
+ */
+data class Reading(
+    val weather: Weather,
+    val isDay: Boolean,
+    val takenAtMs: Long,
+    val utcOffsetSec: Int? = null,
+    val sun: List<SunWindow> = emptyList(),
+)
 
 private val Context.weatherDataStore: DataStore<Preferences> by preferencesDataStore("weather")
 
@@ -41,9 +52,9 @@ private val Context.weatherDataStore: DataStore<Preferences> by preferencesDataS
  *
  * Open-Meteo needs no API key, no account and no attribution, which is what makes it usable
  * in a sideloaded fan app: nothing to leak, nothing to expire, no terms for a tester to
- * accept. Location comes from a city the user picks once, *not* from device location —
- * asking for a location permission to decide whether Castform is holding an umbrella is a
- * trade nobody would take.
+ * accept. Location comes from a city the user picks, or — only when they tap "Use my
+ * location" — one coarse fix of where the phone is, turned into a city and stored like any
+ * other. Nothing reads the location in the background.
  *
  * The reading is cached with a timestamp and every render reads the cache, so the widget
  * still draws with no connection; it simply keeps the last sky it knew about.
@@ -76,12 +87,17 @@ class WeatherSource(context: Context) {
                 prefs.remove(Keys.WEATHER_CODE)
                 prefs.remove(Keys.IS_DAY)
                 prefs.remove(Keys.TAKEN_AT)
+                prefs.remove(Keys.UTC_OFFSET)
+                prefs.remove(Keys.SUN)
             } else {
                 prefs[Keys.PLACE_LABEL] = place.label
                 prefs[Keys.LATITUDE] = place.latitude
                 prefs[Keys.LONGITUDE] = place.longitude
-                // A reading belongs to the place it was taken in, so moving invalidates it.
+                // A reading belongs to the place it was taken in, so moving invalidates it —
+                // including its clock, which would otherwise keep the old city's night.
                 prefs.remove(Keys.TAKEN_AT)
+                prefs.remove(Keys.UTC_OFFSET)
+                prefs.remove(Keys.SUN)
             }
         }
     }
@@ -105,25 +121,24 @@ class WeatherSource(context: Context) {
             weather = Weather.fromWmoCode(code),
             isDay = this[Keys.IS_DAY] ?: true,
             takenAtMs = this[Keys.TAKEN_AT] ?: 0L,
+            utcOffsetSec = this[Keys.UTC_OFFSET],
+            sun = WorldClock.decode(this[Keys.SUN]),
         )
     }
 
     /**
-     * The world as the form rules should see it: the cached sky, and the phone's own clock.
+     * The world as the form rules should see it: the cached sky, and the clock *of the chosen
+     * city*.
      *
-     * The hour is always local and always current — it costs nothing and can never be stale,
-     * so a Lycanroc keeps the right form even if the weather fetch has been failing for days.
-     * With no reading at all the sky is [Weather.CLOUDY], which is the form-neutral answer,
-     * and daylight is guessed from the clock rather than assumed.
+     * Hour and daylight are worked out now, from the place's UTC offset and its sunrise and
+     * sunset, rather than read off the reading — so they never go stale, and a city on the
+     * other side of the world gets its own night. With no reading, or one from before 1.6
+     * that has no clock, the phone's clock stands in as it always did. With no reading at all
+     * the sky is [Weather.CLOUDY], which is the form-neutral answer.
      */
-    suspend fun worldState(): WorldState {
-        val reading = cachedReading()
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        return WorldState(
-            weather = reading?.weather ?: Weather.CLOUDY,
-            isDay = reading?.isDay ?: (hour in 6..18),
-            hour = hour,
-        )
+    suspend fun worldState(nowMs: Long = System.currentTimeMillis()): WorldState {
+        val deviceHour = Calendar.getInstance().apply { timeInMillis = nowMs }.get(Calendar.HOUR_OF_DAY)
+        return WorldClock.worldState(cachedReading(), nowMs, deviceHour)
     }
 
     /** True when there is a place to ask about and the last answer is older than [maxAgeMs]. */
@@ -142,21 +157,35 @@ class WeatherSource(context: Context) {
         val place = place() ?: return@withContext false
         val url = "https://api.open-meteo.com/v1/forecast" +
             "?latitude=${place.latitude}&longitude=${place.longitude}" +
-            "&current=weather_code,is_day&timezone=auto"
+            "&current=weather_code,is_day&daily=sunrise,sunset&forecast_days=2" +
+            "&timezone=auto&timeformat=unixtime"
         val body = get(url) ?: return@withContext false
 
-        val current = runCatching {
-            json.parseToJsonElement(body).jsonObject["current"]?.jsonObject
-        }.getOrNull() ?: return@withContext false
+        val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
+            ?: return@withContext false
+        val current = root["current"]?.jsonObject ?: return@withContext false
 
         val code = current["weather_code"]?.jsonPrimitive?.content?.toIntOrNull()
             ?: return@withContext false
         val isDay = current["is_day"]?.jsonPrimitive?.content?.toIntOrNull() != 0
+        val offset = root["utc_offset_seconds"]?.jsonPrimitive?.content?.toIntOrNull()
+        val sun = runCatching {
+            val daily = root["daily"]?.jsonObject
+            val rises = daily?.get("sunrise")?.jsonArray.orEmpty()
+            val sets = daily?.get("sunset")?.jsonArray.orEmpty()
+            rises.zip(sets).mapNotNull { (rise, set) ->
+                val r = rise.jsonPrimitive.content.toLongOrNull() ?: return@mapNotNull null
+                val s = set.jsonPrimitive.content.toLongOrNull() ?: return@mapNotNull null
+                SunWindow(r, s)
+            }
+        }.getOrDefault(emptyList())
 
         store.edit {
             it[Keys.WEATHER_CODE] = code
             it[Keys.IS_DAY] = isDay
             it[Keys.TAKEN_AT] = System.currentTimeMillis()
+            if (offset != null) it[Keys.UTC_OFFSET] = offset else it.remove(Keys.UTC_OFFSET)
+            if (sun.isNotEmpty()) it[Keys.SUN] = WorldClock.encode(sun) else it.remove(Keys.SUN)
         }
         true
     }
@@ -166,34 +195,46 @@ class WeatherSource(context: Context) {
     /**
      * City search, so nobody has to know what a latitude is. Same host family as the forecast
      * endpoint, and equally key-free.
+     *
+     * The geocoder only matches place *names*, so the query is read several ways by
+     * [PlaceQuery] — "Richmond VA" is asked as "Richmond" and checked against Virginia — and
+     * the first reading whose answers fit is used. If none fit, the plainest answer for the
+     * first reading that found anything is shown rather than nothing: a list with the wrong
+     * Richmond first is still a list the right one might be in.
      */
     suspend fun searchPlaces(query: String, limit: Int = 8): List<Place> =
         withContext(Dispatchers.IO) {
-            val trimmed = query.trim()
-            if (trimmed.length < 2) return@withContext emptyList()
-            val url = "https://geocoding-api.open-meteo.com/v1/search" +
-                "?name=${URLEncoder.encode(trimmed, "UTF-8")}&count=$limit&format=json"
-            val body = get(url) ?: return@withContext emptyList()
-
-            runCatching {
-                val results = json.parseToJsonElement(body).jsonObject["results"]?.jsonArray
-                    ?: return@runCatching emptyList()
-                results.mapNotNull { element ->
-                    val o = element.jsonObject
-                    val name = o["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
-                    val lat = o["latitude"]?.jsonPrimitive?.content?.toDoubleOrNull()
-                        ?: return@mapNotNull null
-                    val lon = o["longitude"]?.jsonPrimitive?.content?.toDoubleOrNull()
-                        ?: return@mapNotNull null
-                    // "Kanpur" alone is ambiguous: there is one in India and one in Pakistan.
-                    val region = listOfNotNull(
-                        o["admin1"]?.jsonPrimitive?.content,
-                        o["country"]?.jsonPrimitive?.content,
-                    ).joinToString(", ")
-                    Place(if (region.isEmpty()) name else "$name, $region", lat, lon)
-                }
-            }.getOrElse { emptyList() }
+            var fallback: List<GeoResult>? = null
+            for (attempt in PlaceQuery.attempts(query)) {
+                val results = geocode(attempt.name)
+                if (fallback == null && results.isNotEmpty()) fallback = results
+                val fitting = PlaceQuery.filter(results, attempt.qualifier)
+                if (fitting != null) return@withContext fitting.take(limit).map { it.toPlace() }
+            }
+            fallback.orEmpty().take(limit).map { it.toPlace() }
         }
+
+    private fun geocode(name: String): List<GeoResult> {
+        val url = "https://geocoding-api.open-meteo.com/v1/search" +
+            "?name=${URLEncoder.encode(name, "UTF-8")}&count=$GEOCODE_COUNT&format=json"
+        val body = get(url) ?: return emptyList()
+        return runCatching {
+            val results = json.parseToJsonElement(body).jsonObject["results"]?.jsonArray
+                ?: return@runCatching emptyList()
+            results.mapNotNull { element ->
+                val o = element.jsonObject
+                fun text(key: String) = o[key]?.jsonPrimitive?.content
+                GeoResult(
+                    name = text("name") ?: return@mapNotNull null,
+                    latitude = text("latitude")?.toDoubleOrNull() ?: return@mapNotNull null,
+                    longitude = text("longitude")?.toDoubleOrNull() ?: return@mapNotNull null,
+                    admin1 = text("admin1"),
+                    country = text("country"),
+                    countryCode = text("country_code"),
+                )
+            }
+        }.getOrElse { emptyList() }
+    }
 
     private fun get(url: String): String? = try {
         client.newCall(Request.Builder().url(url).build()).execute().use { response ->
@@ -211,6 +252,8 @@ class WeatherSource(context: Context) {
         val WEATHER_CODE = intPreferencesKey("weatherCode")
         val IS_DAY = booleanPreferencesKey("isDay")
         val TAKEN_AT = longPreferencesKey("takenAt")
+        val UTC_OFFSET = intPreferencesKey("utcOffsetSec")
+        val SUN = stringPreferencesKey("sunWindows")
     }
 
     companion object {
@@ -218,5 +261,8 @@ class WeatherSource(context: Context) {
 
         /** Weather does not change fast enough to be worth asking more often than this. */
         const val FRESH_FOR_MS = 60 * 60 * 1000L
+
+        /** Enough answers that the right Richmond is among them before the qualifier filters. */
+        private const val GEOCODE_COUNT = 20
     }
 }

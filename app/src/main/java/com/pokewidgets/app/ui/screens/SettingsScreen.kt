@@ -42,6 +42,7 @@ import com.pokewidgets.app.Links
 import com.pokewidgets.app.catalog.Weather
 import com.pokewidgets.app.data.Place
 import com.pokewidgets.app.data.Reading
+import com.pokewidgets.app.data.WorldClock
 import com.pokewidgets.app.ui.components.Caption
 import com.pokewidgets.app.ui.components.PokeButton
 import com.pokewidgets.app.ui.components.PokeHeader
@@ -51,6 +52,9 @@ import com.pokewidgets.app.ui.theme.Ink
 import com.pokewidgets.app.ui.theme.dottedPaper
 import com.pokewidgets.app.ui.theme.sticker
 import com.pokewidgets.app.ui.theme.Card as CardColor
+import java.text.DateFormat
+import java.util.Date
+import java.util.SimpleTimeZone
 
 @Composable
 fun SettingsScreen(
@@ -145,7 +149,7 @@ fun SettingsScreen(
                             Caption(
                                 when {
                                     checkingWeather -> "Checking…"
-                                    weatherReading != null -> describe(weatherReading)
+                                    weatherReading != null -> describe(weatherReading, weatherPlace)
                                     else -> "Not checked yet"
                                 },
                             )
@@ -175,7 +179,7 @@ fun SettingsScreen(
                     when {
                         searchingPlaces -> Caption("Searching…")
                         placeQuery.isNotBlank() && placeResults.isEmpty() ->
-                            Caption("No city by that name. Check the spelling, or try a larger one nearby.")
+                            Caption("No match. Try just the city name — “Richmond” — or a larger one nearby.")
                         else -> placeResults.forEach { place ->
                             PlaceRow(place) { onChoosePlace(place) }
                         }
@@ -251,20 +255,25 @@ fun SettingsScreen(
  * The sky in words, so the person can predict what a live form will do without waiting for
  * a widget to redraw and guessing at the result.
  */
-private fun describe(reading: Reading): String {
+private fun describe(reading: Reading, place: Place): String {
     val sky = when (reading.weather) {
         Weather.CLEAR -> "Clear"
         Weather.CLOUDY -> "Cloudy"
         Weather.RAIN -> "Rain"
         Weather.SNOW -> "Snow"
     }
-    val part = if (reading.isDay) "daytime" else "night"
-    val checked = DateUtils.getRelativeTimeSpanString(
-        reading.takenAtMs,
-        System.currentTimeMillis(),
-        DateUtils.MINUTE_IN_MILLIS,
-    )
-    return "$sky, $part — checked $checked"
+    val now = System.currentTimeMillis()
+    // Day or night *now*, the way a live form will see it — not as of the reading.
+    val part = if (WorldClock.isDay(now, reading.sun, reading.isDay)) "daytime" else "night"
+    // The city's own clock, so someone who picked a city in another time zone can see that
+    // its night is being used and not theirs.
+    val localTime = reading.utcOffsetSec?.let { offset ->
+        val format = DateFormat.getTimeInstance(DateFormat.SHORT)
+        format.timeZone = SimpleTimeZone(offset * 1000, "place")
+        " · ${format.format(Date(now))} in ${place.label.substringBefore(',')}"
+    }.orEmpty()
+    val checked = DateUtils.getRelativeTimeSpanString(reading.takenAtMs, now, DateUtils.MINUTE_IN_MILLIS)
+    return "$sky, $part$localTime — checked $checked"
 }
 
 /**

@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pokewidgets.app.catalog.BackgroundIndex
 import com.pokewidgets.app.catalog.CatalogRepository
+import com.pokewidgets.app.catalog.FormRules
 import com.pokewidgets.app.catalog.PokemonEntry
 import com.pokewidgets.app.catalog.SpriteKey
 import com.pokewidgets.app.catalog.ShinyAvailability
@@ -50,6 +51,11 @@ data class ConfigUiState(
     val warning: String? = null,
     /** The city weather is taken from, or null when none has been chosen in Settings. */
     val weatherPlace: String? = null,
+    /**
+     * The form a live form would show right now, by name — so "it is not working" and "it has
+     * not redrawn yet" can be told apart from this screen. Null when no rule applies.
+     */
+    val liveFormNow: String? = null,
 
     /** Whether a shiny can be shown right now, and if not, why. */
     val shiny: ShinyAvailability = ShinyAvailability.AVAILABLE,
@@ -304,6 +310,12 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         val place = weather.place()?.label
+        val liveFormNow = if (FormRules.appliesTo(config.pokemonId)) {
+            runCatching { catalog.entry(FormRules.formFor(config.pokemonId, weather.worldState()))?.displayName }
+                .getOrNull()
+        } else {
+            null
+        }
 
         val trainers = runCatching { catalog.trainers() }
             .onFailure { Log.e(TAG, "could not read the trainer catalogue", it) }.getOrNull()
@@ -317,6 +329,7 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 entry = entry,
                 weatherPlace = place,
+                liveFormNow = liveFormNow,
                 shiny = set?.shinyAvailability(config.pokemonId, config.back, config.female, config.style)
                     ?: ShinyAvailability.SET_HAS_NONE,
                 trainers = trainers,
