@@ -97,6 +97,14 @@ fun ConfigFlow(widgetId: Int, onDone: () -> Unit) {
             onBack = { step = ConfigStep.SETTINGS },
         )
 
+        ConfigStep.SURPRISE_POOL -> PokemonPicker(
+            all = state.allPokemon,
+            selectedId = state.config.pokemonId,
+            onSelect = viewModel::toggleSurprisePick,
+            onBack = { step = ConfigStep.SETTINGS },
+            chosen = state.config.surprisePool,
+        )
+
         ConfigStep.SPRITE_SET -> SpriteSetPickerScreen(
             pokemonName = state.entry?.displayName ?: "this Pokémon",
             sets = state.availableSetPreviews,
@@ -117,11 +125,13 @@ fun ConfigFlow(widgetId: Int, onDone: () -> Unit) {
             onPickPokemon = { step = ConfigStep.POKEMON },
             onPickSet = { step = ConfigStep.SPRITE_SET },
             onPickTrainer = { step = ConfigStep.TRAINER },
+            onPickSurprisePool = { step = ConfigStep.SURPRISE_POOL },
             actions = ConfigActions(
                 toggleShiny = viewModel::toggleShiny,
                 selectTrainer = viewModel::selectTrainer,
                 setBackgroundMode = viewModel::setBackgroundMode,
                 applyBattleScene = viewModel::applyBattleScene,
+                clearSurprisePicks = viewModel::clearSurprisePicks,
             ),
             onUpdate = viewModel::update,
             onSave = { viewModel.save(onDone) },
@@ -136,4 +146,4 @@ fun ConfigFlow(widgetId: Int, onDone: () -> Unit) {
  * a sprite set means comparing a lot of similar-looking things, and neither comparison
  * fits in a row or survives a container that dismisses on a downward flick.
  */
-private enum class ConfigStep { SETTINGS, POKEMON, SPRITE_SET, TRAINER }
+private enum class ConfigStep { SETTINGS, POKEMON, SURPRISE_POOL, SPRITE_SET, TRAINER }

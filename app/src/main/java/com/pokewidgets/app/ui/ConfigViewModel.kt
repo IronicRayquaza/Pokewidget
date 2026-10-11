@@ -161,6 +161,17 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Adds a Pokémon to the ones "Surprise me" draws from, or takes it out. The pre-chosen
+     * next surprise is dropped either way, so the next render picks from the new list.
+     */
+    fun toggleSurprisePick(pokemonId: Int) = update {
+        val pool = if (pokemonId in it.surprisePool) it.surprisePool - pokemonId else it.surprisePool + pokemonId
+        it.copy(surprisePool = pool, surpriseNext = 0)
+    }
+
+    fun clearSurprisePicks() = update { it.copy(surprisePool = emptySet(), surpriseNext = 0) }
+
     fun selectTrainer(trainerId: String?) {
         update { c ->
             when {

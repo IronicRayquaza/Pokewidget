@@ -7,6 +7,7 @@ import com.pokewidgets.app.sprite.IdleStyle
 /** What a tap on the widget does. */
 enum class TapAction(val label: String, val description: String) {
     CRY("Play cry", "Plays the Pokémon's cry"),
+    SURPRISE("Surprise me", "Swaps in a random Pokémon and plays its cry"),
     SHINY("Toggle shiny", "Swaps between the normal and shiny sprite"),
     FLIP("Turn around", "Swaps between the front and back sprite"),
     MIRROR("Face the other way", "Mirrors the sprite left to right"),
@@ -124,6 +125,18 @@ data class WidgetConfig(
      * the sort of thing someone puts two Castforms on a home screen to do.
      */
     val liveForm: Boolean = false,
+
+    /**
+     * The Pokémon "Surprise me" draws from. Empty — the default — means any Pokémon the
+     * sprite set has; see [com.pokewidgets.app.catalog.SurprisePicker].
+     */
+    val surprisePool: Set<Int> = emptySet(),
+
+    /**
+     * The Pokémon the next "Surprise me" tap will swap in, chosen and downloaded at render
+     * time so the tap itself has nothing to wait for. 0 when none is chosen yet.
+     */
+    val surpriseNext: Int = 0,
 
     /** Set while an "excited" tap burst is running, so the renderer speeds the flip up. */
     val excitedUntilMs: Long = 0L,

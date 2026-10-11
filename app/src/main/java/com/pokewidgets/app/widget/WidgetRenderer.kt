@@ -17,6 +17,8 @@ import com.pokewidgets.app.R
 import com.pokewidgets.app.catalog.CatalogRepository
 import com.pokewidgets.app.catalog.FormRules
 import com.pokewidgets.app.catalog.SpriteSet
+import com.pokewidgets.app.catalog.SurprisePicker
+import com.pokewidgets.app.data.TapAction
 import com.pokewidgets.app.data.Scene
 import com.pokewidgets.app.data.SpriteFetch
 import com.pokewidgets.app.data.TrainerPose
@@ -78,6 +80,40 @@ class WidgetRenderer(private val context: Context) {
         }
         updateSafely(manager, widgetId, views, config)
         warmCry(config)
+        warmSurprise(config)
+    }
+
+    /**
+     * Chooses the Pokémon the next "Surprise me" tap will swap in, if the one on file no
+     * longer fits, and stores it — *before* the views are built, because the tap intent
+     * carries its id so the tap can start that cry without opening the store.
+     */
+    private suspend fun withSurpriseNext(widgetId: Int, config: WidgetConfig): WidgetConfig {
+        if (config.tapAction != TapAction.SURPRISE) return config
+        val set = catalog.set(config.setId) ?: return config
+        val covered = { id: Int -> set.covers(id, back = false, shiny = false, female = false, style = null) }
+        if (SurprisePicker.stillFits(config.surpriseNext, config.surprisePool, covered, config.pokemonId)) return config
+        val next = SurprisePicker.pick(config.surprisePool, covered, config.pokemonId) ?: return config
+        runCatching { if (configStore.exists(widgetId)) configStore.update(widgetId) { it.copy(surpriseNext = next) } }
+            .onFailure { Log.w(TAG, "could not store the next surprise for $widgetId", it) }
+        return config.copy(surpriseNext = next)
+    }
+
+    /**
+     * Downloads the next surprise's sprite and cry now, so the tap that swaps it in has
+     * neither to wait for. Failure is fine: the tap fetches whatever is still missing.
+     */
+    private suspend fun warmSurprise(config: WidgetConfig) {
+        if (config.tapAction != TapAction.SURPRISE || config.surpriseNext <= 0) return
+        val next = config.surpriseNext
+        runCatching {
+            val set = catalog.set(config.setId) ?: return@runCatching
+            source.spriteParts(set, config.spriteKey.copy(pokemonId = next, female = false, style = null))
+        }.onFailure { Log.d(TAG, "could not pre-fetch the sprite for $next", it) }
+        if (config.cryEnabled) {
+            runCatching { CryPlayer.preload(context, next, config.legacyCry) }
+                .onFailure { Log.d(TAG, "could not pre-fetch a cry for $next", it) }
+        }
     }
 
     /**
@@ -113,7 +149,7 @@ class WidgetRenderer(private val context: Context) {
                 ?.also { configStore.put(widgetId, it) }
                 ?: configStore.get(widgetId)
         }
-        return withLiveForm(stored)
+        return withLiveForm(withSurpriseNext(widgetId, stored))
     }
 
     /**

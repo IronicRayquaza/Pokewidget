@@ -7,7 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import com.pokewidgets.app.catalog.CatalogRepository
+import com.pokewidgets.app.catalog.SurprisePicker
 import com.pokewidgets.app.data.SpriteSource
+import com.pokewidgets.app.data.WidgetConfig
 import com.pokewidgets.app.data.TapAction
 import com.pokewidgets.app.data.WeatherSource
 import com.pokewidgets.app.data.WidgetConfigStore
@@ -220,7 +223,9 @@ sealed class PokemonWidgetProvider : AppWidgetProvider() {
         val config = store.get(widgetId)
 
         // A widget drawn by 1.4 has no payload; its first tap decides from the store instead.
-        val sound = cry ?: if (payload == null && TapPayload.of(config).cries) {
+        // A surprise is the exception: its cry belongs to whoever arrives, chosen below.
+        val surprise = config.tapAction == TapAction.SURPRISE
+        val sound = cry ?: if (payload == null && !surprise && TapPayload.of(config).cries) {
             CryPlayer.play(appContext, config.pokemonId, config.legacyCry)
         } else {
             null
@@ -232,13 +237,31 @@ sealed class PokemonWidgetProvider : AppWidgetProvider() {
         // never re-renders, so without this a widget that failed once stayed broken until a
         // reboot. SpriteSource remembers confirmed 404s, so a sprite that genuinely does not
         // exist costs no round trip here.
-        val retryRender = !SpriteSource(appContext).isSpriteCached(config.spriteKey)
+        // A surprise replaces the sprite anyway, so a retry render would only draw twice.
+        val retryRender = !surprise && !SpriteSource(appContext).isSpriteCached(config.spriteKey)
         if (retryRender) launch { WidgetRenderer(appContext).render(widgetId) }
 
         launch {
             when (config.tapAction) {
                 // Already sounding; see above.
                 TapAction.CRY -> Unit
+
+                TapAction.SURPRISE -> {
+                    val next = surpriseFor(appContext, config, payload)
+                    if (next != null && next != config.pokemonId) {
+                        // Chosen here, so not already sounding from the payload.
+                        if (payload == null && config.cryEnabled) {
+                            CryPlayer.play(appContext, next, config.legacyCry)
+                        }
+                        // Replaces the Pokémon on this widget; it never adds another. Style
+                        // and female are per-Pokémon choices, so they do not carry over.
+                        store.update(widgetId) {
+                            it.copy(pokemonId = next, style = null, female = false, surpriseNext = 0)
+                        }
+                        // The render chooses and downloads the surprise after this one.
+                        WidgetRenderer(appContext).render(widgetId)
+                    }
+                }
 
                 TapAction.SHINY -> {
                     store.update(widgetId) { it.copy(shiny = !it.shiny) }
@@ -277,6 +300,20 @@ sealed class PokemonWidgetProvider : AppWidgetProvider() {
 
         sound?.let { withTimeoutOrNull(CRY_START_WAIT_MS) { it.started.await() } }
         Unit
+    }
+
+    /**
+     * Who a surprise tap swaps in. The tap's own payload wins, because its cry is already
+     * playing and the sprite has to match it; a payload naming the Pokémon already on
+     * screen means a second quick tap landed before the redraw, and is left alone. Without
+     * a payload — the first tap after an update — the choice made at render time is used,
+     * and failing that one is made now.
+     */
+    private suspend fun surpriseFor(appContext: Context, config: WidgetConfig, payload: TapPayload?): Int? {
+        if (payload != null) return payload.pokemonId
+        if (config.surpriseNext > 0 && config.surpriseNext != config.pokemonId) return config.surpriseNext
+        val set = CatalogRepository.get(appContext).set(config.setId) ?: return null
+        return SurprisePicker.pick(config.surprisePool, { set.covers(it, false, false, false, null) }, config.pokemonId)
     }
 
     companion object {

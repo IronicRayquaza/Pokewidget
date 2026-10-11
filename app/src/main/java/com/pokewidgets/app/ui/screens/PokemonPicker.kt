@@ -37,6 +37,10 @@ import com.pokewidgets.app.ui.theme.dottedPaper
  *
  * The list, names, types and icons are all bundled, so this screen is fully usable with
  * no network — only the sprite the user finally picks needs downloading.
+ *
+ * With [chosen] set it picks several instead of one: each tap toggles a Pokémon in or out
+ * through [onSelect], and the page stays open until Done. That is how "Surprise me" gets its
+ * list of Pokémon to draw from.
  */
 @Composable
 fun PokemonPicker(
@@ -44,6 +48,7 @@ fun PokemonPicker(
     selectedId: Int,
     onSelect: (Int) -> Unit,
     onBack: () -> Unit,
+    chosen: Set<Int>? = null,
 ) {
     BackHandler(onBack = onBack)
 
@@ -60,7 +65,15 @@ fun PokemonPicker(
             .dottedPaper()
             .statusBarsPadding(),
     ) {
-        PokeHeader("Choose a Pokémon", onBack = onBack)
+        if (chosen == null) {
+            PokeHeader("Choose a Pokémon", onBack = onBack)
+        } else {
+            PokeHeader(
+                if (chosen.isEmpty()) "Pick Pokémon" else "${chosen.size} picked",
+                onBack = onBack,
+                trailing = { PokeButton(text = "Done", onClick = onBack) },
+            )
+        }
 
         PokeSearchField(
             value = query,
@@ -119,7 +132,8 @@ fun PokemonPicker(
                 modifier = Modifier.navigationBarsPadding(),
             ) {
                 items(filtered, key = { it.id }) { entry ->
-                    PokemonCell(entry, entry.id == selectedId) { onSelect(entry.id) }
+                    val selected = if (chosen != null) entry.id in chosen else entry.id == selectedId
+                    PokemonCell(entry, selected) { onSelect(entry.id) }
                 }
             }
         }

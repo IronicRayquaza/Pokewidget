@@ -41,4 +41,19 @@ class TapPayloadTest {
         assertFalse(TapPayload.of(config.copy(tapAction = TapAction.SHINY)).cries)
         assertFalse(TapPayload.of(config.copy(cryEnabled = false)).cries)
     }
+
+    @Test
+    fun `a surprise plays the cry of the Pokemon arriving, not the one leaving`() {
+        val config = WidgetConfig(pokemonId = 25, tapAction = TapAction.SURPRISE, surpriseNext = 133)
+        val payload = TapPayload.of(config)
+        assertTrue(payload.cries)
+        assertEquals(133, payload.pokemonId)
+        assertEquals(payload, roundTrip(payload))
+    }
+
+    @Test
+    fun `a surprise with nothing chosen yet falls back to the store`() {
+        val payload = TapPayload.of(WidgetConfig(pokemonId = 25, tapAction = TapAction.SURPRISE))
+        assertNull(roundTrip(payload))
+    }
 }

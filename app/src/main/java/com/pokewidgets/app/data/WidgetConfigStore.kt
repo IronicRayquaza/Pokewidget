@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.pokewidgets.app.catalog.SurprisePicker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -60,6 +61,8 @@ class WidgetConfigStore(context: Context) {
             prefs[Keys.tap(widgetId)] = config.tapAction.name
             prefs[Keys.idleStyle(widgetId)] = config.idleStyle.name
             prefs[Keys.liveForm(widgetId)] = config.liveForm
+            prefs[Keys.surprisePool(widgetId)] = SurprisePicker.encode(config.surprisePool)
+            prefs[Keys.surpriseNext(widgetId)] = config.surpriseNext
             prefs[Keys.excited(widgetId)] = config.excitedUntilMs
         }
     }
@@ -151,6 +154,8 @@ class WidgetConfigStore(context: Context) {
             tapAction = prefs[Keys.tap(id)].toEnum(d.tapAction),
             idleStyle = prefs[Keys.idleStyle(id)].toEnum(d.idleStyle),
             liveForm = prefs[Keys.liveForm(id)] ?: d.liveForm,
+            surprisePool = SurprisePicker.decode(prefs[Keys.surprisePool(id)]),
+            surpriseNext = prefs[Keys.surpriseNext(id)] ?: 0,
             excitedUntilMs = prefs[Keys.excited(id)] ?: 0L,
         )
     }
@@ -201,6 +206,8 @@ class WidgetConfigStore(context: Context) {
         fun tap(id: Int) = stringPreferencesKey("$id.tap")
         fun idleStyle(id: Int) = stringPreferencesKey("$id.idleStyle")
         fun liveForm(id: Int) = booleanPreferencesKey("$id.liveForm")
+        fun surprisePool(id: Int) = stringPreferencesKey("$id.surprisePool")
+        fun surpriseNext(id: Int) = intPreferencesKey("$id.surpriseNext")
         fun excited(id: Int) = longPreferencesKey("$id.excited")
     }
 }

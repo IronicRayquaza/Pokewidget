@@ -101,6 +101,7 @@ data class ConfigActions(
     val selectTrainer: (String?) -> Unit,
     val setBackgroundMode: (BackgroundMode) -> Unit,
     val applyBattleScene: () -> Unit,
+    val clearSurprisePicks: () -> Unit = {},
 )
 
 @Composable
@@ -109,6 +110,7 @@ fun ConfigScreen(
     onPickPokemon: () -> Unit,
     onPickSet: () -> Unit,
     onPickTrainer: () -> Unit,
+    onPickSurprisePool: () -> Unit,
     actions: ConfigActions,
     onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit,
     onSave: () -> Unit,
@@ -148,7 +150,7 @@ fun ConfigScreen(
             AppearanceSection(state, actions, onUpdate)
             TrainerSection(state, actions, onPickTrainer, onUpdate)
             AnimationSection(state, onUpdate)
-            InteractionSection(state, onUpdate)
+            InteractionSection(state, actions, onPickSurprisePool, onUpdate)
 
             Spacer(Modifier.height(8.dp))
         }
@@ -831,8 +833,36 @@ private fun AnimationSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> 
     }
 }
 
+/**
+ * Where a surprise comes from: any Pokémon, or only the ones picked here. Picking opens the
+ * full Pokémon page in multi-select mode, because choosing favourites out of 1,025 needs the
+ * search and the generation filter, not a row of chips.
+ */
 @Composable
-private fun InteractionSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit) {
+private fun SurprisePool(c: WidgetConfig, onPick: () -> Unit, onClear: () -> Unit) {
+    val picks = c.surprisePool.size
+    Column {
+        Spacer(Modifier.height(16.dp))
+        Caption("Each tap replaces this widget's Pokémon. It never adds another.")
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PokeChip("Any Pokémon", picks == 0, onClear)
+            PokeChip(if (picks == 0) "Only my picks" else "Only my picks ($picks)", picks > 0, onPick)
+        }
+        if (picks > 0) {
+            Spacer(Modifier.height(10.dp))
+            PokeButton(text = "Change picks", onClick = onPick, container = CardColor)
+        }
+    }
+}
+
+@Composable
+private fun InteractionSection(
+    state: ConfigUiState,
+    actions: ConfigActions,
+    onPickSurprisePool: () -> Unit,
+    onUpdate: ((WidgetConfig) -> WidgetConfig) -> Unit,
+) {
     val c = state.config
     Panel {
         SectionHeader("When tapped")
@@ -845,7 +875,11 @@ private fun InteractionSection(state: ConfigUiState, onUpdate: ((WidgetConfig) -
         Spacer(Modifier.height(10.dp))
         Caption(c.tapAction.description)
 
-        AnimatedVisibility(visible = c.tapAction == TapAction.CRY || c.tapAction == TapAction.EXCITE) {
+        AnimatedVisibility(visible = c.tapAction == TapAction.SURPRISE) {
+            SurprisePool(c, onPickSurprisePool, actions.clearSurprisePicks)
+        }
+
+        AnimatedVisibility(visible = c.tapAction in setOf(TapAction.CRY, TapAction.EXCITE, TapAction.SURPRISE)) {
             Column {
                 Spacer(Modifier.height(16.dp))
                 SettingRow(

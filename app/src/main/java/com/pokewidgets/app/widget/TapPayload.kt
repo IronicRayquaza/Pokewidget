@@ -14,6 +14,9 @@ import com.pokewidgets.app.data.WidgetConfig
  *
  * Plain values in and out through two lambdas, so it round-trips on the JVM without an
  * `Intent` (which is a stub in unit tests).
+ *
+ * @param pokemonId whose cry the tap plays. For "Surprise me" that is the Pokémon about to be
+ *   swapped in, not the one on screen — the new arrival announces itself.
  */
 data class TapPayload(
     val pokemonId: Int,
@@ -23,7 +26,7 @@ data class TapPayload(
 ) {
     /** Whether this tap should make a sound at all. */
     val cries: Boolean
-        get() = cryEnabled && (tapAction == TapAction.CRY || tapAction == TapAction.EXCITE)
+        get() = cryEnabled && tapAction in SOUNDING
 
     fun write(putInt: (String, Int) -> Unit, putString: (String, String) -> Unit) {
         putInt(KEY_POKEMON, pokemonId)
@@ -36,8 +39,19 @@ data class TapPayload(
         private const val KEY_FLAGS = "pokewidget.tap.flags"
         private const val KEY_ACTION = "pokewidget.tap.action"
 
-        fun of(config: WidgetConfig) =
-            TapPayload(config.pokemonId, config.cryEnabled, config.legacyCry, config.tapAction)
+        private val SOUNDING = setOf(TapAction.CRY, TapAction.EXCITE, TapAction.SURPRISE)
+
+        /**
+         * For "Surprise me" with nothing chosen yet, [pokemonId] is 0 and [read] returns null,
+         * so the tap falls back to the store and picks there — rather than playing the cry of
+         * the Pokémon that is about to leave.
+         */
+        fun of(config: WidgetConfig) = TapPayload(
+            pokemonId = if (config.tapAction == TapAction.SURPRISE) config.surpriseNext else config.pokemonId,
+            cryEnabled = config.cryEnabled,
+            legacyCry = config.legacyCry,
+            tapAction = config.tapAction,
+        )
 
         /**
          * Null when the intent predates this payload — a widget last drawn by 1.4 — so the
