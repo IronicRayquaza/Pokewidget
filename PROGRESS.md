@@ -76,6 +76,26 @@ Status snapshot for PokéWidget. See `README.md` for architecture and how-it-wor
       triggering `PACKAGE_CHANGED` → `AppWidgetServiceImpl` re-broadcast (replaced with a
       plain coroutine off `goAsync()`).
 
+**1.6 (branch `dev/1.6`, in testing — not released, not merged)**
+- [x] Surprise me tap action with an optional pool (`SurprisePicker`), next surprise pre-picked
+      and pre-fetched at render time, its id carried in the tap intent. Verified on the
+      Pixel 6 Pro API 30 emulator: a pool of Bulbasaur/Charmander/Squirtle only ever produced
+      those three, never the same twice running, in one widget, cries starting 4–39 ms after
+      the tap.
+- [x] City search reads "Richmond VA" / "Richmond Virginia" (`PlaceQuery`); verified on the
+      emulator and in Chrome against the live geocoder.
+- [x] Live forms follow the chosen city's clock and sunrise/sunset (`WorldClock`). Verified:
+      emulator at 9:43 AM IST, Richmond chosen → "night · 12:11 AM in Richmond", widget drew
+      Midnight Lycanroc.
+- [x] "Use my location" (coarse, one-shot, on request). Built and wired; **not yet tried on a
+      real phone** — the emulator has no location fix configured.
+- [x] Desktop/browser parity: every tap action, Surprise me, live forms and the city picker.
+      Verified in headless Chrome against the built site (all tap actions, pool respected,
+      one sprite, Richmond readout).
+- [x] `desktop` workflow builds Windows/macOS (universal)/Linux as run artifacts only.
+- [ ] A Mac tester opens the `.dmg` from a workflow run (nobody here has a Mac).
+- [ ] "Use my location" on a real phone, and in the desktop app on Windows and macOS.
+
 ## Not delivered / known gaps
 
 - **Ruby/Sapphire and FireRed/LeafGreen are still static.** Emerald and all of Gen 4 now

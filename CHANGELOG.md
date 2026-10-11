@@ -2,6 +2,37 @@
 
 What changed, written for someone using the app rather than reading the diff.
 
+## 1.6 (in testing, not released)
+
+**New**
+
+- **Surprise me.** A new choice under "When tapped": each tap swaps the Pokémon on the widget
+  for a random one and plays the newcomer's cry. It replaces the sprite — it never adds a
+  second one — and the swap sticks. Pick from any Pokémon, or choose your own shortlist with
+  "Only my picks". The next surprise is downloaded ahead of time, so the cry starts the moment
+  you tap.
+- **Use my location.** Settings → Weather can now take your location instead of a typed city.
+  It asks for permission only when you tap the button, reads your position once, and keeps
+  only the city.
+- **The desktop app catches up.** Clicking a desktop widget can now do everything tapping one
+  on a phone can — Surprise me included — and live forms work there too, with the city picker
+  right in the widget's settings. (Desktop widgets hop when excited, since a computer can't
+  speed up the animation the way a phone does.)
+
+**Fixes**
+
+- **Cities you couldn't find.** Searching "Richmond VA" found Richmond Vale in the Caribbean,
+  and "Richmond Virginia" found nothing. City search now understands state, province and
+  country names and abbreviations, with or without a comma.
+- **Live forms used your clock, not the city's.** Pick a city where it's night while it's day
+  where you are, and Lycanroc, Shaymin, Morpeko and Castform followed your time of day instead
+  of the city's. They now follow the chosen city's own clock and sunrise and sunset, and
+  Settings shows the time there so you can check.
+- Widget setup shows which form a live form is in right now.
+
+Like before: none of this changes a widget you've already placed. Tapping still plays the cry
+until you choose otherwise, and nothing asks for your location unless you tap the button.
+
 ## 1.5
 
 Installs over 1.4 and keeps your widgets. Thanks to everyone who sent feedback after the first
