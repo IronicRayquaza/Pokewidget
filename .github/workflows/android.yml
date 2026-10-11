@@ -30,8 +30,10 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: gradle
-      # The wrapper is not marked executable in the repo.
-      - run: bash ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug
+      # The wrapper is not marked executable in the repo, and gradle.properties pins
+      # org.gradle.java.home to a JDK on the developer's Windows machine; point it at this
+      # runner's JDK instead (a -D system property overrides gradle.properties).
+      - run: bash ./gradlew --no-daemon "-Dorg.gradle.java.home=$JAVA_HOME" :app:testDebugUnitTest :app:assembleDebug
       - name: Name the APK after the version and commit
         run: |
           version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
