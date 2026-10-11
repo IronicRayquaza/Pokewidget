@@ -67,6 +67,8 @@ class MainActivity : ComponentActivity() {
                         onPlaceQuery = viewModel::searchPlaces,
                         onChoosePlace = viewModel::choosePlace,
                         onCheckWeather = viewModel::checkWeatherNow,
+                        onUseLocation = viewModel::useDeviceLocation,
+                        onLocationDenied = viewModel::locationDenied,
                         onClearCrash = viewModel::clearCrashReport,
                         onPlayCry = viewModel::playCry,
                     )

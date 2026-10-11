@@ -13,6 +13,7 @@ import com.pokewidgets.app.catalog.PokemonEntry
 import com.pokewidgets.app.catalog.SpriteKey
 import com.pokewidgets.app.catalog.SpriteSet
 import com.pokewidgets.app.data.CrashLog
+import com.pokewidgets.app.data.DeviceLocation
 import com.pokewidgets.app.data.Place
 import com.pokewidgets.app.data.Reading
 import com.pokewidgets.app.data.SpriteSource
@@ -72,6 +73,8 @@ data class MainUiState(
     /** The last sky we read for that city. Shown so the feature is visible before a widget redraws. */
     val weatherReading: Reading? = null,
     val checkingWeather: Boolean = false,
+    /** True while "Use my location" is waiting for a fix. */
+    val locating: Boolean = false,
     val placeQuery: String = "",
     val placeResults: List<Place> = emptyList(),
     val searchingPlaces: Boolean = false,
@@ -337,6 +340,33 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { WeatherRefreshScheduler.sync(getApplication()) }
                 .onFailure { Log.w(TAG, "could not sync the weather alarm", it) }
             renderLiveFormWidgets()
+        }
+    }
+
+    /**
+     * One fix of where the phone is, saved as the city. Called only after the person tapped
+     * "Use my location" and granted the permission; a failure leaves the setting alone and
+     * says so, because search still works and is the obvious next thing to try.
+     */
+    fun useDeviceLocation() {
+        launchSafely("find where you are") {
+            _state.update { it.copy(locating = true, message = null) }
+            val place = runCatching { DeviceLocation(getApplication()).currentPlace() }
+                .onFailure { Log.w(TAG, "location fix failed", it) }
+                .getOrNull()
+            _state.update {
+                it.copy(
+                    locating = false,
+                    message = if (place == null) "Couldn't tell where you are. Search for your city instead." else null,
+                )
+            }
+            if (place != null) choosePlace(place)
+        }
+    }
+
+    fun locationDenied() {
+        _state.update {
+            it.copy(message = "No problem — search for your city instead. Location is only used if you allow it.")
         }
     }
 

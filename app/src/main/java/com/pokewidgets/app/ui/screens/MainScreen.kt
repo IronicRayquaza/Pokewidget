@@ -80,6 +80,8 @@ fun MainScreen(
     onPlaceQuery: (String) -> Unit,
     onChoosePlace: (Place?) -> Unit,
     onCheckWeather: () -> Unit,
+    onUseLocation: () -> Unit,
+    onLocationDenied: () -> Unit,
     onClearCrash: () -> Unit,
     onPlayCry: (Int) -> Unit,
 ) {
@@ -109,6 +111,9 @@ fun MainScreen(
             searchingPlaces = state.searchingPlaces,
             onPlaceQuery = onPlaceQuery,
             onChoosePlace = onChoosePlace,
+            locating = state.locating,
+            onUseLocation = onUseLocation,
+            onLocationDenied = onLocationDenied,
             crashReport = state.crashReport,
             onClearCrash = onClearCrash,
             message = state.message,

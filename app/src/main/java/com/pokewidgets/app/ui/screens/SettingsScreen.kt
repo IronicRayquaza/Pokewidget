@@ -1,11 +1,15 @@
 package com.pokewidgets.app.ui.screens
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.text.format.DateUtils
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.pokewidgets.app.BuildConfig
 import com.pokewidgets.app.Links
 import com.pokewidgets.app.catalog.Weather
@@ -70,6 +76,9 @@ fun SettingsScreen(
     searchingPlaces: Boolean = false,
     onPlaceQuery: (String) -> Unit = {},
     onChoosePlace: (Place?) -> Unit = {},
+    locating: Boolean = false,
+    onUseLocation: () -> Unit = {},
+    onLocationDenied: () -> Unit = {},
     crashReport: String? = null,
     onClearCrash: () -> Unit = {},
     message: String? = null,
@@ -169,6 +178,8 @@ fun SettingsScreen(
                         container = CardColor,
                     )
                 } else {
+                    UseLocationButton(locating, onUseLocation, onLocationDenied)
+                    Spacer(Modifier.height(12.dp))
                     PokeSearchField(
                         value = placeQuery,
                         onValueChange = onPlaceQuery,
@@ -186,8 +197,8 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.height(4.dp))
                     Caption(
-                        "Your location is never read. Only the city you pick here is stored, " +
-                            "and only on this device.",
+                        "Your location is read once, only when you tap “Use my location”. " +
+                            "Only the city is kept, and only on this device.",
                     )
                 }
             }
@@ -356,6 +367,30 @@ private fun openLink(context: Context, url: String) {
             Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }.onFailure { Log.w("SettingsScreen", "could not open $url", it) }
+}
+
+/**
+ * Asks for coarse location only when tapped, and only if it is not already granted. A refusal
+ * is answered with a pointer to search rather than another prompt.
+ */
+@Composable
+private fun UseLocationButton(locating: Boolean, onUseLocation: () -> Unit, onDenied: () -> Unit) {
+    val context = LocalContext.current
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) onUseLocation() else onDenied()
+    }
+    PokeButton(
+        text = if (locating) "Finding you…" else "Use my location",
+        onClick = {
+            val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+            if (granted) onUseLocation() else permission.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        },
+        icon = Icons.Default.MyLocation,
+        container = CardColor,
+        enabled = !locating,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 /** One city from the search, tappable. */
