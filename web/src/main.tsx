@@ -21,10 +21,13 @@ import {
   type PlacedWidget,
   type WidgetConfig,
 } from './core/store';
-import { canPlayCries, playCry, preloadCry } from './core/audio';
+import { canPlayCries, preloadCry } from './core/audio';
 import { isDesktop, openWidgetWindow } from './desktop';
 import { WidgetView } from './ui/WidgetView';
 import { BackgroundPicker, PokemonPicker, SetPicker, TrainerPicker } from './ui/pickers';
+import { TapSection } from './ui/TapSection';
+import { LiveFormSection } from './ui/WeatherSection';
+import { useShownConfig, useSurprisePrep, useWidgetTap } from './ui/useWidgetTap';
 
 type Panel = 'pokemon' | 'set' | 'trainer' | null;
 
@@ -185,9 +188,14 @@ function Editor({
   const trainer = catalogs.trainers.trainers.find((t) => t.i === config.trainerId);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // The preview behaves exactly like the widget: live form, every tap action, surprises.
+  const shown = useShownConfig(config);
+  const tap = useWidgetTap(widget.id, config, shown, catalogs, true);
+  useSurprisePrep(widget.id, config, catalogs);
+
   useEffect(() => {
-    if (config.cryEnabled) preloadCry(config.pokemonId, config.legacyCry);
-  }, [config.pokemonId, config.legacyCry, config.cryEnabled]);
+    if (shown.cryEnabled) preloadCry(shown.pokemonId, shown.legacyCry);
+  }, [shown.pokemonId, shown.legacyCry, shown.cryEnabled]);
 
   const shiny = set ? shinyAvailability(set, config.pokemonId, config.back, config.female, config.style) : 'set-has-none';
 
@@ -232,13 +240,12 @@ function Editor({
       <div class="card">
         <div class="stage" style={{ width: '100%', height: previewHeight + 24 }}>
           <WidgetView
-            config={config}
+            config={shown}
             catalogs={catalogs}
             width={previewWidth}
             height={previewHeight}
-            onClick={() => {
-              if (config.cryEnabled) void playCry(config.pokemonId, config.legacyCry);
-            }}
+            excited={tap.excited}
+            onClick={tap.onClick}
           />
         </div>
         <div class="row" style={{ marginTop: 14 }}>
@@ -257,9 +264,6 @@ function Editor({
               Back sprite
             </button>
           )}
-          <button aria-pressed={config.cryEnabled} onClick={() => change({ cryEnabled: !config.cryEnabled })}>
-            Cry on click
-          </button>
           <span style={{ flex: 1 }} />
           <button
             class="primary"
@@ -336,6 +340,8 @@ function Editor({
           </div>
         )}
       </div>
+
+      <LiveFormSection config={config} catalogs={catalogs} change={change} />
 
       <div class="card">
         <p class="section-title">Background</p>
@@ -515,8 +521,12 @@ function Editor({
               ? 'As big as the widget allows.'
               : 'An exact multiple of the sprite’s own pixels.'}
         </p>
+      </div>
 
-        <div class="row" style={{ marginTop: 18 }}>
+      <TapSection config={config} catalogs={catalogs} change={change} />
+
+      <div class="card">
+        <div class="row">
           <button onClick={onRemove}>Delete this widget</button>
         </div>
       </div>

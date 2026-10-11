@@ -220,6 +220,26 @@ img.pixel-art {
   image-rendering: pixelated;
 }
 
+/*
+ * "Get excited": three hops that run once, the browser's stand-in for Android speeding the
+ * animation up. `translate` rather than `transform`, so a mirrored sprite stays mirrored.
+ */
+.widget .sprite.excited {
+  animation: hop 2.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes hop {
+  0%, 30%, 60%, 100% { translate: 0 0; }
+  12%, 42%, 72% { translate: 0 -10%; }
+  85% { translate: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .widget .sprite.excited {
+    animation: none;
+  }
+}
+
 .stage {
   background: var(--sky);
   border: 3px solid var(--ink);

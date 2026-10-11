@@ -6,8 +6,17 @@
  * which it is running in.
  */
 
+interface TauriWindow {
+  close(): Promise<void>;
+  show?(): Promise<void>;
+  unminimize?(): Promise<void>;
+  setFocus?(): Promise<void>;
+}
+
 interface TauriWindowApi {
-  WebviewWindow: new (label: string, options: Record<string, unknown>) => { close(): Promise<void> };
+  WebviewWindow: (new (label: string, options: Record<string, unknown>) => TauriWindow) & {
+    getByLabel?: (label: string) => Promise<TauriWindow | null>;
+  };
   getCurrentWindow?: () => { close(): Promise<void> };
 }
 
@@ -44,4 +53,26 @@ export async function openWidgetWindow(id: number, width: number, height: number
     shadow: false,
     title: 'PokéWidget',
   });
+}
+
+/**
+ * Brings the setup window forward — the desktop's version of the Android "Open PokéWidget"
+ * tap action. It is reopened if it was closed while widgets stayed on the desktop. In a
+ * browser the setup page opens in a tab, reusing one already open.
+ */
+export async function openSetupWindow(): Promise<void> {
+  const api = tauri();
+  if (!api?.webviewWindow) {
+    window.open('index.html', 'pokewidget-setup');
+    return;
+  }
+  const { WebviewWindow } = api.webviewWindow;
+  const main = await WebviewWindow.getByLabel?.('main').catch(() => null);
+  if (main) {
+    await main.unminimize?.().catch(() => undefined);
+    await main.show?.().catch(() => undefined);
+    await main.setFocus?.().catch(() => undefined);
+    return;
+  }
+  new WebviewWindow('main', { url: 'index.html', title: 'PokeWidget', width: 1100, height: 820 });
 }

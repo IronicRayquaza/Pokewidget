@@ -30,12 +30,15 @@ export function WidgetView({
   width,
   height,
   onClick,
+  excited = false,
 }: {
   config: WidgetConfig;
   catalogs: Catalogs;
   width: number;
   height: number;
   onClick?: () => void;
+  /** Mid "Get excited" hop. A browser cannot speed up a GIF the way Android does. */
+  excited?: boolean;
 }) {
   const set = catalogs.set(config.setId);
   const sprite = set
@@ -120,7 +123,7 @@ export function WidgetView({
 
       {sprite && spriteBox && (
         <img
-          class="layer sprite"
+          class={excited ? 'layer sprite excited' : 'layer sprite'}
           src={sprite}
           alt={catalogs.entry(config.pokemonId)?.n ?? 'Pokémon'}
           style={{

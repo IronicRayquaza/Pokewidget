@@ -1,6 +1,6 @@
 [package]
 name = "pokewidget"
-version = "1.5.0"
+version = "1.6.0"
 description = "Animated Pokemon sprites on your desktop"
 authors = ["IronicRayquaza"]
 edition = "2021"

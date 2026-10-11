@@ -3,8 +3,9 @@ import { useEffect, useState } from 'preact/hooks';
 import './styles.css';
 import { loadCatalogs, type Catalogs } from './core/data';
 import { getWidget, onWidgetsChanged, type PlacedWidget } from './core/store';
-import { playCry, preloadCry } from './core/audio';
+import { preloadCry } from './core/audio';
 import { WidgetView } from './ui/WidgetView';
+import { useShownConfig, useSurprisePrep, useWidgetTap } from './ui/useWidgetTap';
 
 /**
  * A widget on its own, filling whatever window it is in.
@@ -16,7 +17,6 @@ import { WidgetView } from './ui/WidgetView';
 function WidgetWindow({ id }: { id: number }) {
   const [catalogs, setCatalogs] = useState<Catalogs | null>(null);
   const [widget, setWidget] = useState<PlacedWidget | undefined>(() => getWidget(id));
-  const size = useWindowSize();
 
   useEffect(() => {
     loadCatalogs().then(setCatalogs).catch(() => setCatalogs(null));
@@ -24,11 +24,19 @@ function WidgetWindow({ id }: { id: number }) {
 
   useEffect(() => onWidgetsChanged(() => setWidget(getWidget(id))), [id]);
 
-  useEffect(() => {
-    if (widget?.config.cryEnabled) preloadCry(widget.config.pokemonId, widget.config.legacyCry);
-  }, [widget?.config.pokemonId, widget?.config.legacyCry, widget?.config.cryEnabled]);
-
   if (!catalogs || !widget) return null;
+  return <PlacedWidgetView widget={widget} catalogs={catalogs} />;
+}
+
+function PlacedWidgetView({ widget, catalogs }: { widget: PlacedWidget; catalogs: Catalogs }) {
+  const size = useWindowSize();
+  const shown = useShownConfig(widget.config);
+  const { onClick, excited } = useWidgetTap(widget.id, widget.config, shown, catalogs);
+  useSurprisePrep(widget.id, widget.config, catalogs);
+
+  useEffect(() => {
+    if (shown.cryEnabled) preloadCry(shown.pokemonId, shown.legacyCry);
+  }, [shown.pokemonId, shown.legacyCry, shown.cryEnabled]);
 
   return (
     <div
@@ -36,13 +44,12 @@ function WidgetWindow({ id }: { id: number }) {
       style={{ width: '100vw', height: '100vh', display: 'grid', placeItems: 'center' }}
     >
       <WidgetView
-        config={widget.config}
+        config={shown}
         catalogs={catalogs}
         width={size.width}
         height={size.height}
-        onClick={() => {
-          if (widget.config.cryEnabled) void playCry(widget.config.pokemonId, widget.config.legacyCry);
-        }}
+        excited={excited}
+        onClick={widget.config.tapAction === 'none' ? undefined : onClick}
       />
     </div>
   );

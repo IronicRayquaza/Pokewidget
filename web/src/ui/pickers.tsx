@@ -12,17 +12,24 @@ import {
 import { battleFrame } from '../core/scene';
 import type { WidgetConfig } from '../core/store';
 
-/** The Pokémon list, searchable and filterable by generation. */
+/**
+ * The Pokémon list, searchable and filterable by generation.
+ *
+ * With `chosen` it picks several: each click toggles one in or out, which is how "Surprise
+ * me" gets its list.
+ */
 export function PokemonPicker({
   catalogs,
   selectedId,
   shiny,
   onSelect,
+  chosen,
 }: {
   catalogs: Catalogs;
   selectedId: number;
   shiny: boolean;
   onSelect: (id: number) => void;
+  chosen?: number[];
 }) {
   const [query, setQuery] = useState('');
   const [generation, setGeneration] = useState<number | null>(null);
@@ -64,7 +71,7 @@ export function PokemonPicker({
             <button
               key={entry.i}
               class="tile"
-              aria-pressed={entry.i === selectedId}
+              aria-pressed={chosen ? chosen.includes(entry.i) : entry.i === selectedId}
               onClick={() => onSelect(entry.i)}
             >
               <span class="art">{url && <img src={url} alt="" class="pixel-art" loading="lazy" />}</span>

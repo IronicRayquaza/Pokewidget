@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into the macOS app's own Info.plist by Tauri. Without a usage string, macOS refuses
+  the web view's location request outright; with it, the person is asked, once, and only
+  after they click "Use my location".
+-->
+<plist version="1.0">
+<dict>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>PokeWidget uses your location once, when you ask it to, to find your city's weather for live forms.</string>
+</dict>
+</plist>

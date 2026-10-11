@@ -4,10 +4,14 @@ import type { FillMode, Scene, TrainerSide } from './scene';
  * A widget's settings, and where they live.
  *
  * The same fields as `data/WidgetConfig.kt`, minus the ones that only mean something on a
- * home screen (animation smoothness is the launcher's memory budget talking, and the tap
- * action is always "play the cry" here). Everything optional is off by default, so a widget
- * nobody has touched is a plain Pokémon on nothing — the rule the Android app follows too.
+ * home screen (animation smoothness is the launcher's memory budget talking). Everything
+ * optional is off by default, so a widget nobody has touched is a plain Pokémon on nothing
+ * that cries when clicked — the rule the Android app follows too.
  */
+
+/** What a click does; the same choices as the Android `TapAction`. See `tap.ts`. */
+export type TapAction = 'cry' | 'surprise' | 'shiny' | 'flip' | 'mirror' | 'excite' | 'open-app' | 'none';
+
 export interface WidgetConfig {
   pokemonId: number;
   setId: string;
@@ -31,6 +35,14 @@ export interface WidgetConfig {
   fill: FillMode;
   cryEnabled: boolean;
   legacyCry: boolean;
+
+  tapAction: TapAction;
+  /** Who "Surprise me" draws from; empty means any Pokémon the sprite set has. */
+  surprisePool: number[];
+  /** The next surprise, chosen ahead so its cry is ready before the click. 0 for none yet. */
+  surpriseNext: number;
+  /** Let the weather and the chosen city's clock pick the form, for the few that have one. */
+  liveForm: boolean;
 }
 
 export interface PlacedWidget {
@@ -60,6 +72,10 @@ export const DEFAULT_CONFIG: WidgetConfig = {
   fill: 'fit',
   cryEnabled: true,
   legacyCry: true,
+  tapAction: 'cry',
+  surprisePool: [],
+  surpriseNext: 0,
+  liveForm: false,
 };
 
 /** A scene needs a trainer to be anything but solo; see `WidgetConfig.effectiveScene`. */
