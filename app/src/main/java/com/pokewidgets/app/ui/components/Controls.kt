@@ -357,6 +357,14 @@ fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Under every "Add to home screen" button. A widget's first draw downloads its animation and
+ * cry, and a blank square for those seconds otherwise reads as broken. Worded as a note, not
+ * an apology: nothing is wrong.
+ */
+const val FIRST_DRAW_NOTE =
+    "The first time, a new widget can take 5–10 seconds to appear while its animation and cry download."
+
 /** Body copy that explains a control, or the absence of one. */
 @Composable
 fun Caption(text: String, modifier: Modifier = Modifier, color: Color = InkSoft) {

@@ -72,6 +72,7 @@ import com.pokewidgets.app.ui.BackgroundMode
 import com.pokewidgets.app.ui.ConfigUiState
 import com.pokewidgets.app.ui.backgroundMode
 import com.pokewidgets.app.ui.components.Caption
+import com.pokewidgets.app.ui.components.FIRST_DRAW_NOTE
 import com.pokewidgets.app.ui.components.MirrorChip
 import com.pokewidgets.app.ui.components.PokeButton
 import com.pokewidgets.app.ui.components.PokeChip
@@ -171,6 +172,8 @@ fun ConfigScreen(
                 icon = Icons.Default.Check,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Spacer(Modifier.height(8.dp))
+            Caption(FIRST_DRAW_NOTE)
         }
     }
 }

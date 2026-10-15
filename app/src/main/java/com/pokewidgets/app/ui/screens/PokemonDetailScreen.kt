@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.pokewidgets.app.catalog.PokemonEntry
 import com.pokewidgets.app.ui.SetPreview
 import com.pokewidgets.app.ui.components.Caption
+import com.pokewidgets.app.ui.components.FIRST_DRAW_NOTE
 import com.pokewidgets.app.ui.components.DexBadge
 import com.pokewidgets.app.ui.components.PokeButton
 import com.pokewidgets.app.ui.components.PokeIconButton
@@ -284,6 +285,8 @@ private fun DetailFooter(
                 enabled = selectedSetId != null,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Spacer(Modifier.height(8.dp))
+            Caption(FIRST_DRAW_NOTE)
         } else {
             // Some launchers decline requestPinAppWidget. Saying so beats a button that
             // silently does nothing.
