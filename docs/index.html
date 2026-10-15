@@ -126,6 +126,22 @@
   }
   .btn:active { transform: translateY(var(--lift)); box-shadow: 0 0 0 var(--ink); }
   .btn.coral { background: var(--coral); }
+  /* One button per platform, stacked, with room for each one's lift. */
+  .downloads { display: grid; gap: calc(12px + var(--lift)); }
+  /* Mac: shaped like the others so the row reads as one set, but flat and quiet, and not a
+     link, so nobody mistakes it for something to click. */
+  .btn.soon {
+    background: var(--chalk);
+    color: var(--ink-soft);
+    border-style: dashed;
+    box-shadow: none;
+    cursor: default;
+  }
+  .btn.soon:active { transform: none; }
+
+  /* The platform names inside "Installing it": body type, set apart only by weight. */
+  h3 { font-size: 15px; line-height: 1.4; margin: 18px 0 8px; }
+  h3:first-of-type { margin-top: 0; }
   .btn .meta { display: block; font-size: 12px; font-weight: 400; color: var(--ink-soft); margin-top: 6px; }
 
   ol, ul { margin: 0; padding-left: 22px; }
@@ -159,7 +175,7 @@
   <header>
     <h1 class="pixel">Poké<span class="accent">Widget</span></h1>
     <p class="tagline">Animated Pokémon sprites, living on your home screen.</p>
-    <p class="sub">Any Pokémon, in any game's art. Tap one to hear its cry. Android only, and free.</p>
+    <p class="sub">Any Pokémon, in any game's art. Tap one to hear its cry. For Android and Windows, and free.</p>
   </header>
 
   <!-- The thing a still frame cannot show. Muted so it is allowed to autoplay at all, with
@@ -178,33 +194,35 @@
 
   <div class="card">
     <h2 class="pixel">Download</h2>
-    <a class="btn" id="download" href="https://github.com/IronicRayquaza/Pokewidget/releases/latest">
-      <span id="download-label">Download the latest release</span>
-      <span class="meta" id="download-meta">Android 8.0 and up</span>
-    </a>
+    <!-- Both buttons start on the releases page and are pointed at the file itself once the
+         latest release has been read; see the script at the end. -->
+    <div class="downloads">
+      <a class="btn" id="download-android" href="https://github.com/IronicRayquaza/Pokewidget/releases/latest">
+        <span id="android-label">Download for Android</span>
+        <span class="meta" id="android-meta">Android 8.0 and up</span>
+      </a>
+      <a class="btn" id="download-windows" href="https://github.com/IronicRayquaza/Pokewidget/releases/latest">
+        <span id="windows-label">Download for Windows</span>
+        <span class="meta" id="windows-meta">Windows 10 and 11, 64-bit</span>
+      </a>
+      <!-- Not a link: there is nothing to download yet, and a button that goes nowhere is worse
+           than one that says so. -->
+      <div class="btn soon" aria-disabled="true">
+        <span>Mac</span>
+        <span class="meta">Coming soon</span>
+      </div>
+    </div>
+    <!-- IMAGE SLOT: a PokéWidget sitting on a Windows desktop. -->
     <p class="sub" style="margin-top: 16px">
-      Every release has a <code>.sha256</code> file next to the APK if you want to check what
-      you downloaded. <a href="https://github.com/IronicRayquaza/Pokewidget/releases">All
+      Every release has a <code>.sha256</code> file next to each download if you want to check
+      what you got. <a href="https://github.com/IronicRayquaza/Pokewidget/releases">All
       releases and what changed in each</a>.
-    </p>
-  </div>
-
-  <div class="card sky">
-    <h2 class="pixel">On a computer too</h2>
-    <p class="sub" style="margin: 0 0 16px">
-      The same widgets run in a browser, and as a desktop app whose windows float on top of
-      whatever you are doing. Nothing to install for the browser version.
-    </p>
-    <!-- IMAGE SLOT: PokéWidget windows floating on a desktop. -->
-    <a class="btn" href="./app/">Open it in this browser</a>
-    <p class="sub" style="margin: 16px 0 0">
-      Desktop installers for Windows, macOS and Linux are built from the same code, but they
-      are still being tested — the browser version above is the one to use for now.
     </p>
   </div>
 
   <div class="card chalk">
     <h2 class="pixel">Installing it</h2>
+    <h3>On Android</h3>
     <p class="sub" style="margin: 0 0 14px">
       This is not on the Play Store, so Android will check twice that you meant it. Both
       warnings are normal and neither means anything is wrong:
@@ -217,6 +235,15 @@
         <b>More details</b> first if that button is hidden.</li>
       <li><b>Add a widget.</b> Long-press an empty part of your home screen, tap
         <b>Widgets</b>, find PokéWidget, and drag one out.</li>
+    </ol>
+    <h3>On Windows</h3>
+    <ol>
+      <li><b>Run the downloaded installer.</b> Windows may say it protected your PC, because
+        the app is not signed by a big publisher. Click <b>More info</b>, then
+        <b>Run anyway</b>.</li>
+      <li><b>Make a widget and put it on the desktop.</b> It sits on your wallpaper under your
+        open apps; drag it anywhere, pull its corner to resize it, or pin it to keep it on top
+        of everything.</li>
     </ol>
   </div>
 
@@ -264,6 +291,17 @@
     <a class="btn coral" id="discord-link" href="#">Join the Discord</a>
   </div>
 
+  <!-- A plain link rather than Buy Me a Coffee's own button script: no third-party code on the
+       page, and it keeps the page's look. -->
+  <div class="card chalk" id="coffee-card" hidden>
+    <h2 class="pixel">Buy me a coffee</h2>
+    <p class="sub" style="margin: 0 0 16px">
+      PokéWidget is free and stays free. If it made your home screen a little better, a coffee
+      helps keep it going.
+    </p>
+    <a class="btn" id="coffee-link" href="#" target="_blank" rel="noopener">Buy me a coffee</a>
+  </div>
+
   <footer>
     <p>
       Sprites and cries are downloaded from the community PokéAPI mirrors and veekun's
@@ -297,6 +335,15 @@
     document.getElementById("discord-card").hidden = false;
   }
 
+  // Your Buy Me a Coffee page, e.g. "https://buymeacoffee.com/yourname". Empty hides the card,
+  // the same way the Discord one works, so the page never shows a button that goes nowhere.
+  const BUY_ME_A_COFFEE = "";
+
+  if (BUY_ME_A_COFFEE) {
+    document.getElementById("coffee-link").href = BUY_ME_A_COFFEE;
+    document.getElementById("coffee-card").hidden = false;
+  }
+
   const demo = document.getElementById("demo");
   const sound = document.getElementById("sound");
 
@@ -323,13 +370,19 @@
   })
     .then(response => (response.ok ? response.json() : Promise.reject(response.status)))
     .then(release => {
-      const apk = (release.assets || []).find(asset => asset.name.endsWith(".apk"));
-      if (!apk) return;
-      document.getElementById("download").href = apk.browser_download_url;
-      document.getElementById("download-label").textContent =
-        "Download " + release.tag_name + " for Android";
-      document.getElementById("download-meta").textContent =
-        apk.name + " · " + megabytes(apk.size) + " · Android 8.0 and up";
+      const assets = release.assets || [];
+      // Each button is pointed at its own file only if this release has one; otherwise it
+      // keeps going to the releases page.
+      const fill = (asset, platform, requirement) => {
+        if (!asset) return;
+        document.getElementById("download-" + platform).href = asset.browser_download_url;
+        document.getElementById(platform + "-label").textContent =
+          "Download " + release.tag_name + " for " + (platform === "android" ? "Android" : "Windows");
+        document.getElementById(platform + "-meta").textContent =
+          asset.name + " · " + megabytes(asset.size) + " · " + requirement;
+      };
+      fill(assets.find(asset => asset.name.endsWith(".apk")), "android", "Android 8.0 and up");
+      fill(assets.find(asset => asset.name.endsWith(".exe")), "windows", "Windows 10 and 11, 64-bit");
     })
     .catch(() => {
       // No release yet, offline, or rate-limited. The button still goes to the releases page,
