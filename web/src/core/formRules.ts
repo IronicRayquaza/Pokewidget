@@ -89,5 +89,11 @@ export const appliesTo = (pokemonId: number): boolean => byMember.has(pokemonId)
 export const formFor = (pokemonId: number, world: WorldState): number =>
   byMember.get(pokemonId)?.pick(world) ?? pokemonId;
 
+/**
+ * Every form `pokemonId` can be turned into, itself included; just itself without a rule.
+ * `FormRules.familyOf` on Android.
+ */
+export const familyOf = (pokemonId: number): number[] => byMember.get(pokemonId)?.members ?? [pokemonId];
+
 /** Short phrase for the editor, e.g. "follows the weather". */
 export const describeRule = (pokemonId: number): string | null => byMember.get(pokemonId)?.label ?? null;

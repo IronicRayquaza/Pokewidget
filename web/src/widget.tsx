@@ -5,7 +5,7 @@ import { loadCatalogs, type Catalogs } from './core/data';
 import { getWidget, onWidgetsChanged, type PlacedWidget } from './core/store';
 import { preloadCry } from './core/audio';
 import { WidgetView } from './ui/WidgetView';
-import { useShownConfig, useSurprisePrep, useWidgetTap } from './ui/useWidgetTap';
+import { useAheadPrep, useShownConfig, useSurprisePrep, useWidgetTap } from './ui/useWidgetTap';
 
 /**
  * A widget on its own, filling whatever window it is in.
@@ -33,6 +33,7 @@ function PlacedWidgetView({ widget, catalogs }: { widget: PlacedWidget; catalogs
   const shown = useShownConfig(widget.config);
   const { onClick, excited } = useWidgetTap(widget.id, widget.config, shown, catalogs);
   useSurprisePrep(widget.id, widget.config, catalogs);
+  useAheadPrep(widget.config, catalogs);
 
   useEffect(() => {
     if (shown.cryEnabled) preloadCry(shown.pokemonId, shown.legacyCry);

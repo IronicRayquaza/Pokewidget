@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { appliesTo, formFor, weatherFromWmo, type WorldState } from './formRules';
 import { attempts, filter, toPlace, type GeoResult } from './placeQuery';
 import { hourAt, isDayAt, worldStateOf, type Reading } from './weather';
-import { applyTap, pickSurprise, surpriseStillFits, LAST_SPECIES } from './tap';
+import {
+  aheadIds,
+  aheadLooks,
+  applyTap,
+  pickSurprise,
+  surpriseStillFits,
+  toggleSurprisePick,
+  LAST_SPECIES,
+  MAX_SURPRISE_PICKS,
+} from './tap';
 import { DEFAULT_CONFIG } from './store';
 
 const world = (w: Partial<WorldState> = {}): WorldState => ({ weather: 'cloudy', isDay: true, hour: 12, ...w });
@@ -135,6 +144,34 @@ describe('clicks, matching the Android tap actions', () => {
     expect(surpriseStillFits(133, [6], everything, 25)).toBe(false);
     expect(surpriseStillFits(10034, [], everything, 25)).toBe(false);
     expect(surpriseStillFits(25, [], everything, 25)).toBe(false);
+  });
+
+  it('downloads every pick and every live form ahead, matching PrefetchTest.kt', () => {
+    expect(aheadIds({ ...config, pokemonId: 25 })).toEqual([]);
+    expect(aheadIds({ ...config, tapAction: 'surprise', surprisePool: [448, 6, 150] })).toEqual([6, 150, 448]);
+    expect(aheadIds({ ...config, tapAction: 'surprise', surprisePool: [] })).toEqual([]);
+    expect(aheadIds({ ...config, tapAction: 'cry', surprisePool: [6] })).toEqual([]);
+    expect(aheadIds({ ...config, pokemonId: 745, liveForm: true })).toEqual([745, 10126, 10152]);
+    expect(aheadIds({ ...config, pokemonId: 10126, liveForm: true })).toEqual([745, 10126, 10152]);
+    expect(aheadIds({ ...config, pokemonId: 745, liveForm: false })).toEqual([]);
+  });
+
+  it('downloads the other side of what a click toggles, and nothing else', () => {
+    const now = { back: true, shiny: false };
+    expect(aheadLooks({ ...config, back: true, tapAction: 'shiny' })).toEqual([now, { back: true, shiny: true }]);
+    expect(aheadLooks({ ...config, back: true, tapAction: 'flip' })).toEqual([now, { back: false, shiny: false }]);
+    expect(aheadLooks({ ...config, back: true, tapAction: 'cry' })).toEqual([now]);
+    expect(aheadLooks({ ...config, back: true, tapAction: 'mirror' })).toEqual([now]);
+  });
+
+  it('stops picks at ten, and taking one out always works', () => {
+    const ten = Array.from({ length: MAX_SURPRISE_PICKS }, (_, i) => i + 1);
+    expect(toggleSurprisePick([], 25)).toEqual([25]);
+    expect(toggleSurprisePick([25], 25)).toEqual([]);
+    expect(toggleSurprisePick(ten, 99)).toBe(ten);
+    expect(toggleSurprisePick(ten, 3)).not.toContain(3);
+    const savedBeforeTheCap = Array.from({ length: 12 }, (_, i) => i + 1);
+    expect(toggleSurprisePick(savedBeforeTheCap, 5)).toHaveLength(11);
   });
 
   it('toggles shiny, back and mirror, hops when excited, and opens the app', () => {

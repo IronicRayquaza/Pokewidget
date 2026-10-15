@@ -3,7 +3,7 @@ import type { Catalogs } from '../core/data';
 import { covers, spriteUrl } from '../core/catalog';
 import { appliesTo, formFor } from '../core/formRules';
 import { announceChange, updateWidget, type WidgetConfig } from '../core/store';
-import { applyTap, pickSurprise, surpriseStillFits } from '../core/tap';
+import { aheadIds, aheadLooks, applyTap, pickSurprise, surpriseStillFits } from '../core/tap';
 import { isStale, onWeatherChanged, refresh, worldState } from '../core/weather';
 import { playCry, preloadCry } from '../core/audio';
 import { openSetupWindow } from '../desktop';
@@ -87,6 +87,46 @@ export function useSurprisePrep(widgetId: number, config: WidgetConfig, catalogs
     config.legacyCry,
     config.back,
     config.shiny,
+  ]);
+}
+
+/**
+ * Downloads everything the widget can show without anyone choosing again — all its picks,
+ * every form Live form can choose, and the shiny or back sprite its click toggles to — so
+ * neither a click nor a change of sky waits on the network. Cries are decoded and kept;
+ * sprites land in the browser's cache, the same plain image request the widget makes to draw
+ * them. Already-fetched ones cost nothing. `Prefetch.kt` on Android.
+ */
+export function useAheadPrep(config: WidgetConfig, catalogs: Catalogs): void {
+  const ids = [...new Set([config.pokemonId, ...aheadIds(config)])];
+  const looks = aheadLooks(config);
+  useEffect(() => {
+    const set = catalogs.set(config.setId);
+    for (const id of ids) {
+      // Both cry flavours are settled here, so a Pokémon with no Game Boy cry has its modern
+      // one decoded before the click rather than found missing at it.
+      if (config.cryEnabled) preloadCry(id, config.legacyCry);
+      if (!set) continue;
+      for (const look of looks) {
+        // The widget's own Pokémon keeps its style and female choice; picks and forms drop
+        // both when they arrive, as applyTap does.
+        const own = id === config.pokemonId;
+        const female = own && config.female;
+        const style = own ? config.style : null;
+        if (!covers(set, id, look.back, look.shiny, female, style)) continue;
+        const url = spriteUrl(catalogs.sets, set, { setId: set.id, pokemonId: id, ...look, female, style });
+        if (url) new Image().src = url;
+      }
+    }
+  }, [
+    catalogs,
+    ids.join(','),
+    JSON.stringify(looks),
+    config.setId,
+    config.female,
+    config.style,
+    config.cryEnabled,
+    config.legacyCry,
   ]);
 }
 

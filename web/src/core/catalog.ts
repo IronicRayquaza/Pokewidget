@@ -279,10 +279,16 @@ export const spriteUrl = (index: SpriteSetIndex, set: SpriteSet, key: SpriteKey,
 /** How many files one sprite of this set is assembled from; Gen 4 keeps its two frames apart. */
 export const partCount = (set: SpriteSet): number => Math.max(set.frameDirs?.length ?? 0, 1);
 
+/**
+ * Every place a cry can come from, in order: the preferred flavour from both hosts, then the
+ * other flavour from both. Both hosts, as on Android, because jsDelivr now and then answers
+ * 404 for a file that exists, and that alone used to swap the Game Boy cry for the modern one.
+ */
 export const cryUrls = (pokemonId: number, legacy: boolean): string[] =>
-  (legacy ? ['legacy', 'latest'] : ['latest', 'legacy']).map(
-    (flavour) => `https://cdn.jsdelivr.net/gh/PokeAPI/cries@main/cries/pokemon/${flavour}/${pokemonId}.ogg`,
-  );
+  (legacy ? ['legacy', 'latest'] : ['latest', 'legacy']).flatMap((flavour) => [
+    `https://cdn.jsdelivr.net/gh/PokeAPI/cries@main/cries/pokemon/${flavour}/${pokemonId}.ogg`,
+    `https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/${flavour}/${pokemonId}.ogg`,
+  ]);
 
 export const displayName = (entry: PokemonEntry): string => (entry.f ? `${entry.n} (${entry.f})` : entry.n);
 

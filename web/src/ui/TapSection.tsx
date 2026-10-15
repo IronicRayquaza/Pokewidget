@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import type { Catalogs } from '../core/data';
 import type { WidgetConfig } from '../core/store';
-import { TAP_ACTIONS } from '../core/tap';
+import { MAX_SURPRISE_PICKS, TAP_ACTIONS, toggleSurprisePick } from '../core/tap';
 import { PokemonPicker } from './pickers';
 
 /**
@@ -24,9 +24,8 @@ export function TapSection({
   const sounding = config.tapAction === 'cry' || config.tapAction === 'excite' || config.tapAction === 'surprise';
 
   const toggle = (id: number) => {
-    const pool = config.surprisePool.includes(id)
-      ? config.surprisePool.filter((p) => p !== id)
-      : [...config.surprisePool, id];
+    const pool = toggleSurprisePick(config.surprisePool, id);
+    if (pool === config.surprisePool) return;
     // The chosen next surprise may have just left the pool; let it be chosen again.
     change({ surprisePool: pool, surpriseNext: 0 });
   };
@@ -66,6 +65,13 @@ export function TapSection({
               </button>
             )}
           </div>
+          {picking && (
+            <p class="caption">
+              {picks >= MAX_SURPRISE_PICKS
+                ? `That's ${MAX_SURPRISE_PICKS}, the most a widget can hold. Click one to take it out before adding another.`
+                : `${picks} of ${MAX_SURPRISE_PICKS} picked.`}
+            </p>
+          )}
           {picking && (
             <div style={{ marginTop: 12 }}>
               <PokemonPicker

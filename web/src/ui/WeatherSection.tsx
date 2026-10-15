@@ -139,6 +139,8 @@ function WeatherPlace({ weather }: { weather: { place: Place | null; reading: Re
                 (time ? ` · ${time} in ${place.label.split(',')[0]}` : '')
               : 'Not checked yet'}
         </p>
+        {/* Otherwise "Check now" reads as something that has to be pressed. Same line as Android. */}
+        <p class="caption">Updates itself about once an hour while a widget uses Live form.</p>
         <div class="row" style={{ marginTop: 8 }}>
           <button
             disabled={busy !== null}

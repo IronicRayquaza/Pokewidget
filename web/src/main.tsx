@@ -27,7 +27,7 @@ import { WidgetView } from './ui/WidgetView';
 import { BackgroundPicker, PokemonPicker, SetPicker, TrainerPicker } from './ui/pickers';
 import { TapSection } from './ui/TapSection';
 import { LiveFormSection } from './ui/WeatherSection';
-import { useShownConfig, useSurprisePrep, useWidgetTap } from './ui/useWidgetTap';
+import { useAheadPrep, useShownConfig, useSurprisePrep, useWidgetTap } from './ui/useWidgetTap';
 
 type Panel = 'pokemon' | 'set' | 'trainer' | null;
 
@@ -187,11 +187,13 @@ function Editor({
   const entry = catalogs.entry(config.pokemonId);
   const trainer = catalogs.trainers.trainers.find((t) => t.i === config.trainerId);
   const [notice, setNotice] = useState<string | null>(null);
+  const [opened, setOpened] = useState(false);
 
   // The preview behaves exactly like the widget: live form, every tap action, surprises.
   const shown = useShownConfig(config);
   const tap = useWidgetTap(widget.id, config, shown, catalogs, true);
   useSurprisePrep(widget.id, config, catalogs);
+  useAheadPrep(config, catalogs);
 
   useEffect(() => {
     if (shown.cryEnabled) preloadCry(shown.pokemonId, shown.legacyCry);
@@ -267,12 +269,20 @@ function Editor({
           <span style={{ flex: 1 }} />
           <button
             class="primary"
-            onClick={() => void openWidgetWindow(widget.id, previewWidth, previewHeight)}
+            onClick={() => {
+              void openWidgetWindow(widget.id, previewWidth, previewHeight);
+              setOpened(true);
+            }}
           >
             {isDesktop() ? 'Put it on the desktop' : 'Open in its own window'}
           </button>
         </div>
         {notice && <p class="caption">{notice}</p>}
+        {opened && (
+          <p class="caption">
+            The first time, a new widget can take 5–10 seconds to appear while its animation and cry download.
+          </p>
+        )}
       </div>
 
       <div class="card">

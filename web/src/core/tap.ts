@@ -1,3 +1,4 @@
+import { appliesTo, familyOf } from './formRules';
 import type { TapAction, WidgetConfig } from './store';
 
 /**
@@ -31,6 +32,47 @@ export interface TapResult {
 
 /** The last species number; everything above is an alternate form. */
 export const LAST_SPECIES = 1025;
+
+/** How many Pokémon "Only my picks" holds; `SurprisePicker.MAX_PICKS` on Android. */
+export const MAX_SURPRISE_PICKS = 10;
+
+/**
+ * The pool with `id` taken out if it was in, or added if there is room. Taking out always
+ * works, so a pool saved before the cap existed can still be trimmed.
+ */
+export function toggleSurprisePick(pool: number[], id: number): number[] {
+  if (pool.includes(id)) return pool.filter((p) => p !== id);
+  return pool.length >= MAX_SURPRISE_PICKS ? pool : [...pool, id];
+}
+
+/**
+ * Who a widget can turn into without anyone choosing again: every one of its picks, and every
+ * form Live form can choose. All of them are downloaded ahead, as `Prefetch.idsFor` does on
+ * Android. "Any Pokémon" adds nothing — a thousand sprites is not a download to make on
+ * someone's behalf — and keeps its one-ahead choice instead.
+ */
+export function aheadIds(config: WidgetConfig): number[] {
+  const ids = new Set<number>();
+  if (config.tapAction === 'surprise') config.surprisePool.forEach((id) => ids.add(id));
+  if (config.liveForm && appliesTo(config.pokemonId)) familyOf(config.pokemonId).forEach((id) => ids.add(id));
+  return [...ids].sort((a, b) => a - b);
+}
+
+export interface Look {
+  back: boolean;
+  shiny: boolean;
+}
+
+/**
+ * Every look a click can give the widget: the one it has, and the other side of whatever its
+ * tap action toggles — `Prefetch.looksFor` on Android. A mirror is drawn, not downloaded.
+ */
+export function aheadLooks(config: WidgetConfig): Look[] {
+  const now = { back: config.back, shiny: config.shiny };
+  if (config.tapAction === 'shiny') return [now, { ...now, shiny: !now.shiny }];
+  if (config.tapAction === 'flip') return [now, { ...now, back: !now.back }];
+  return [now];
+}
 
 /** Everything the pool allows that the sprite set drew. Empty pool means every species. */
 export function surpriseCandidates(pool: number[], covered: (id: number) => boolean): number[] {
