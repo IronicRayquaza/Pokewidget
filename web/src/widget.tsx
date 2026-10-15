@@ -2,17 +2,20 @@ import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import './styles.css';
 import { loadCatalogs, type Catalogs } from './core/data';
-import { getWidget, onWidgetsChanged, type PlacedWidget } from './core/store';
+import { displayName } from './core/catalog';
+import { announceChange, getWidget, onWidgetsChanged, requestEdit, setOnTop, type PlacedWidget } from './core/store';
 import { preloadCry } from './core/audio';
+import { applyLayer, removeFromDesktop, showSettings, startMove, startResize } from './desktop';
 import { WidgetView } from './ui/WidgetView';
+import { usePressOrDrag, WidgetChrome } from './ui/WidgetChrome';
 import { useAheadPrep, useShownConfig, useSurprisePrep, useWidgetTap } from './ui/useWidgetTap';
 
 /**
- * A widget on its own, filling whatever window it is in.
+ * A widget on its own, filling the window it is in: what each desktop widget window loads.
  *
- * This is what a desktop widget window loads, and what the browser shows when a widget is
- * opened in its own tab. It follows the same settings the setup app writes, and redraws when
- * they change in another window.
+ * The window has no frame and no background, so all that shows on the desktop is the widget
+ * itself. Dragging it anywhere moves the window, the grip resizes it, a click does its tap
+ * action, and it follows the settings window's changes as they are made.
  */
 function WidgetWindow({ id }: { id: number }) {
   const [catalogs, setCatalogs] = useState<Catalogs | null>(null);
@@ -24,33 +27,64 @@ function WidgetWindow({ id }: { id: number }) {
 
   useEffect(() => onWidgetsChanged(() => setWidget(getWidget(id))), [id]);
 
+  // On top of every window, or down on the desktop: set when the page loads, and again
+  // whenever it is changed, here or in the settings window.
+  const onTop = Boolean(widget?.onTop);
+  useEffect(() => {
+    void applyLayer(onTop);
+  }, [onTop]);
+
   if (!catalogs || !widget) return null;
-  return <PlacedWidgetView widget={widget} catalogs={catalogs} />;
+  return <DesktopWidget widget={widget} catalogs={catalogs} onTop={onTop} />;
 }
 
-function PlacedWidgetView({ widget, catalogs }: { widget: PlacedWidget; catalogs: Catalogs }) {
+function DesktopWidget({ widget, catalogs, onTop }: { widget: PlacedWidget; catalogs: Catalogs; onTop: boolean }) {
+  const id = widget.id;
   const size = useWindowSize();
+  // The same click as the Android widget: live form, every tap action, surprises.
   const shown = useShownConfig(widget.config);
-  const { onClick, excited } = useWidgetTap(widget.id, widget.config, shown, catalogs);
-  useSurprisePrep(widget.id, widget.config, catalogs);
+  const tap = useWidgetTap(id, widget.config, shown, catalogs);
+  useSurprisePrep(id, widget.config, catalogs);
   useAheadPrep(widget.config, catalogs);
 
   useEffect(() => {
     if (shown.cryEnabled) preloadCry(shown.pokemonId, shown.legacyCry);
   }, [shown.pokemonId, shown.legacyCry, shown.cryEnabled]);
 
+  const press = usePressOrDrag({
+    onTap: () => {
+      if (widget.config.tapAction !== 'none') tap.onClick();
+    },
+    onDragStart: (event) => {
+      // The OS takes the pointer from here and moves the whole window with it.
+      (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(event.pointerId);
+      startMove();
+    },
+  });
+
+  const entry = catalogs.entry(widget.config.pokemonId);
+  const name = entry ? displayName(entry) : 'Pokémon';
+
   return (
-    <div
-      data-tauri-drag-region
-      style={{ width: '100vw', height: '100vh', display: 'grid', placeItems: 'center' }}
-    >
-      <WidgetView
-        config={shown}
-        catalogs={catalogs}
-        width={size.width}
-        height={size.height}
-        excited={excited}
-        onClick={widget.config.tapAction === 'none' ? undefined : onClick}
+    <div class="placed desktop" aria-label={`${name} widget`} {...press} onDragStart={(event) => event.preventDefault()}>
+      <WidgetView config={shown} catalogs={catalogs} width={size.width} height={size.height} excited={tap.excited} />
+      <WidgetChrome
+        name={name}
+        removeLabel="Take off the desktop"
+        onEdit={() => {
+          requestEdit(id);
+          void showSettings();
+        }}
+        onRemove={() => void removeFromDesktop(id)}
+        pinned={onTop}
+        onPin={() => {
+          setOnTop(id, !onTop);
+          announceChange();
+        }}
+        onGripDown={(event) => {
+          event.preventDefault();
+          startResize();
+        }}
       />
     </div>
   );

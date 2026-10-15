@@ -13,6 +13,9 @@ import { resolve } from 'node:path';
 export default defineConfig({
   base: './',
   plugins: [preact()],
+  // `tauri dev` waits for the app on this exact port (devUrl in tauri.conf.json). On Vite's
+  // default port the desktop window never opens, and only the browser version can be seen.
+  server: { port: 5178, strictPort: true },
   // An empty inline config stops Vite walking up the drive looking for one: a stray
   // postcss.config.mjs in a parent folder would otherwise be applied to this app.
   css: { postcss: {} },

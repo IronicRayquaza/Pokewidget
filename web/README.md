@@ -1,8 +1,13 @@
 # PokéWidget for desktops and browsers
 
-The same widgets, outside Android: a page you set them up on, and a chromeless widget view
-that runs either as a browser window or as a frameless, transparent, always-on-top window on
-Windows, macOS and Linux.
+The same widgets, outside Android, and they behave like widgets rather than windows:
+
+- **In a browser, the tab is the home screen.** Widgets sit straight on the page at the spot they
+  were dragged to, with nothing behind them unless their Background setting asks for it. Drag to
+  move, the corner grip resizes, and editing slides a sheet in beside the widget.
+- **On a desktop, widgets sit on the wallpaper, behind your apps.** Each is a frameless,
+  transparent window with no taskbar button (Windows, macOS and Linux via Tauri). The app's own
+  window is only for setting them up; close it and they stay, with a tray icon to bring it back.
 
 ```bash
 npm install
@@ -90,9 +95,17 @@ Removing the warning for good means signing and notarising the app: an Apple Dev
 | `cdn.jsdelivr.net` | Pokémon sprites, cries, trainer back sprites, backgrounds | Sends CORS headers, so pixels and audio can be read |
 | `play.pokemonshowdown.com` | Trainer front sprites | No CORS: only ever displayed, never read |
 | `veekun.com` | Emerald and Gen 4 animation | No CORS: displayed only |
+| `wsrv.nl` | Any of the above, as a last resort | An image proxy, only used when a file's own host fails |
 
 That is why trainer *backs* can be sliced and recoloured in a canvas but fronts cannot — and
 they need no processing anyway.
+
+Some networks cannot reach every host. A firewall that inspects HTTPS (a Fortinet on a school
+or office network, for one) re-signs play.pokemonshowdown.com and veekun.com with a
+certificate the computer does not trust, so every trainer front and the Gen 3–4 veekun sets
+fail while jsDelivr works. `src/core/imageSource.ts` therefore gives every image the wsrv.nl
+proxy as a last resort, and once the proxy has worked for a host that failed, tries it first
+for that host for the rest of the session.
 
 ## Known limits
 
@@ -100,8 +113,14 @@ they need no processing anyway.
 - **Cries need a click first.** Browsers refuse to start audio before the page is interacted
   with, which suits a widget you click anyway.
 - **Widgets live in this browser profile.** They are kept in `localStorage`, so they do not
-  follow you to another browser or machine.
+  follow you to another browser or machine, and every tab of the app shows the same home screen.
+- **A desktop widget's whole window catches the mouse**, including the see-through space around
+  the sprite, so desktop icons under that space cannot be clicked. Keep widgets clear of icons,
+  or size them snugly.
+- **Widgets on top of everything cover what is under their whole window**, see-through space
+  included, so size a pinned widget snugly.
+- **Always-on-bottom has only been checked on Windows.** macOS and Linux get the same window
+  option, but how their window managers treat it has not been tried yet.
 - **Transparent windows on macOS** need `macOSPrivateApi`, which the config turns on. That is
   fine for direct downloads but would block an App Store submission.
-- **The desktop app has no tray icon or autostart yet**, and widget windows float above other
-  windows rather than sitting on the desktop behind icons.
+- **No autostart yet**: widgets come back when the app is started, not when the computer is.

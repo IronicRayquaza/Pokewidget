@@ -1,4 +1,8 @@
 import type { FillMode, Scene, TrainerSide } from './scene';
+import { DEFAULT_IDLE, type IdleStyle } from './idle';
+import type { Rect } from './homeScreen';
+
+export type { Rect };
 
 /**
  * A widget's settings, and where they live.
@@ -33,6 +37,8 @@ export interface WidgetConfig {
   scene: Scene;
 
   fill: FillMode;
+  /** How a still sprite moves; sets with real animation ignore it. See `idle.ts`. */
+  idleStyle: IdleStyle;
   cryEnabled: boolean;
   legacyCry: boolean;
 
@@ -50,6 +56,15 @@ export interface PlacedWidget {
   config: WidgetConfig;
   /** Desktop only: the last size and position of this widget's own window. */
   window?: { width: number; height: number; x?: number; y?: number };
+  /** Browser only: where the widget sits on the tab's home screen. */
+  page?: Rect;
+  /** Desktop only: the widget is out on the desktop, and goes back there after a restart. */
+  onDesktop?: boolean;
+  /**
+   * Desktop only: float above every window instead of sitting on the wallpaper under them.
+   * Off unless chosen, so a widget put out on the desktop behaves like a home-screen one.
+   */
+  onTop?: boolean;
 }
 
 export const DEFAULT_CONFIG: WidgetConfig = {
@@ -70,6 +85,7 @@ export const DEFAULT_CONFIG: WidgetConfig = {
   trainerFlip: false,
   scene: 'solo',
   fill: 'fit',
+  idleStyle: DEFAULT_IDLE,
   cryEnabled: true,
   legacyCry: true,
   tapAction: 'cry',
@@ -151,6 +167,69 @@ export function rememberWindow(id: number, window: PlacedWidget['window']): void
   if (!widget) return;
   widget.window = window;
   write(saved);
+}
+
+/** Puts back a widget that was just removed, with its own id, for an Undo. */
+export function restoreWidget(widget: PlacedWidget): void {
+  const saved = read();
+  if (saved.widgets.some((w) => w.id === widget.id)) return;
+  saved.widgets.push(widget);
+  saved.widgets.sort((a, b) => a.id - b.id);
+  saved.nextId = Math.max(saved.nextId, widget.id + 1);
+  write(saved);
+}
+
+export function placeOnPage(id: number, rect: Rect): void {
+  const saved = read();
+  const widget = saved.widgets.find((w) => w.id === id);
+  if (!widget) return;
+  widget.page = rect;
+  write(saved);
+}
+
+export function setOnDesktop(id: number, on: boolean): void {
+  const saved = read();
+  const widget = saved.widgets.find((w) => w.id === id);
+  if (!widget) return;
+  widget.onDesktop = on;
+  write(saved);
+}
+
+export function setOnTop(id: number, on: boolean): void {
+  const saved = read();
+  const widget = saved.widgets.find((w) => w.id === id);
+  if (!widget) return;
+  widget.onTop = on;
+  write(saved);
+}
+
+const EDITING_KEY = 'pokewidget.editing';
+
+/**
+ * Asks the settings window to open a widget's editor. A desktop widget window has no editor of
+ * its own, so it leaves a note that the settings window picks up through the storage event.
+ */
+export function requestEdit(id: number): void {
+  try {
+    localStorage.setItem(EDITING_KEY, JSON.stringify({ id, at: Date.now() }));
+  } catch {
+    // The settings window can still be opened from the tray.
+  }
+}
+
+/** Calls `listener` with the widget another window asked to edit. */
+export function onEditRequested(listener: (id: number) => void): () => void {
+  const handler = (event: StorageEvent) => {
+    if (event.key !== EDITING_KEY || !event.newValue) return;
+    try {
+      const { id } = JSON.parse(event.newValue) as { id: number };
+      if (Number.isFinite(id)) listener(id);
+    } catch {
+      // A note nobody can read asks for nothing.
+    }
+  };
+  window.addEventListener('storage', handler);
+  return () => window.removeEventListener('storage', handler);
 }
 
 /**

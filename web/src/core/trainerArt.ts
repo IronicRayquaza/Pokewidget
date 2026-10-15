@@ -1,5 +1,6 @@
 import type { Trainer, TrainerBack, TrainerIndex } from './catalog';
 import { trainerFrontUrl } from './catalog';
+import { loadFirst, withProxy } from './imageSource';
 
 /**
  * Turns a trainer's downloaded image into something drawable, the same way
@@ -13,7 +14,9 @@ import { trainerFrontUrl } from './catalog';
  *
  * Fronts come from play.pokemonshowdown.com, which sends no CORS header, so their pixels
  * cannot be read — they need no processing, and are handed back as a plain URL. The backs
- * are on jsDelivr, which does, so those can go through a canvas.
+ * are on jsDelivr, which does, so those can go through a canvas. Either can come through the
+ * image proxy when its own host is out of reach (see `imageSource.ts`); the proxy allows
+ * cross-origin reads too, so a proxied back is still recoloured.
  */
 
 export interface TrainerArt {
@@ -26,15 +29,6 @@ export interface TrainerArt {
 }
 
 const cache = new Map<string, TrainerArt>();
-
-const loadImage = (src: string, crossOrigin = false): Promise<HTMLImageElement> =>
-  new Promise((resolve, reject) => {
-    const image = new Image();
-    if (crossOrigin) image.crossOrigin = 'anonymous';
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`could not load ${src}`));
-    image.src = src;
-  });
 
 const parseColor = (hex: string): [number, number, number] => {
   const value = Number.parseInt(hex.replace('#', ''), 16);
@@ -87,7 +81,7 @@ function clearEdgeBackground(data: Uint8ClampedArray, w: number, h: number, back
 }
 
 async function processBack(back: TrainerBack): Promise<TrainerArt> {
-  const image = await loadImage(back.u, true);
+  const { image } = await loadFirst(withProxy([back.u]), true);
   const w = Math.min(back.w, image.naturalWidth);
   const h = Math.min(back.h, image.naturalHeight);
   const canvas = document.createElement('canvas');
@@ -131,7 +125,6 @@ export async function trainerArt(index: TrainerIndex, trainer: Trainer, back: bo
 }
 
 async function front(index: TrainerIndex, trainer: Trainer, standIn: boolean): Promise<TrainerArt> {
-  const src = trainerFrontUrl(index, trainer);
-  const image = await loadImage(src);
+  const { src, image } = await loadFirst(withProxy([trainerFrontUrl(index, trainer)]));
   return { src, width: image.naturalWidth, height: image.naturalHeight, standIn };
 }

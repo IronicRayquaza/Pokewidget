@@ -29,7 +29,7 @@ A sideloaded app cannot update itself, so new versions are announced in
 ## On desktops and in browsers
 
 The same widgets run outside Android: **[open the web version](https://ironicrayquaza.github.io/Pokewidget/app/)**,
-or build the desktop app, whose windows are frameless, transparent and always on top.
+or build the desktop app, whose widgets sit right on your desktop with no frame or background.
 
 The code is in [`web/`](web/README.md) — one TypeScript app, packaged with Tauri for the
 desktop. It reads the very same generated catalogs the Android app ships, and the rules that

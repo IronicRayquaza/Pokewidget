@@ -30,6 +30,42 @@ What changed, written for someone using the app rather than reading the diff.
   Settings shows the time there so you can check.
 - Widget setup shows which form a live form is in right now.
 
+- **"Only my picks" holds ten.** Surprise me's shortlist stops at ten Pokémon, and says so.
+- **Nothing waits for a download at the tap.** Every pick, every live form and the shiny or
+  back sprite a tap switches to are downloaded ahead, cries included — a Pokémon with no
+  Game Boy cry has its modern one ready before you tap.
+- **No freeze on "Use my location".** Finding the city could leave the app not responding for
+  a few seconds on some phones. If the app ever does freeze, Settings now keeps a report of
+  it, like it does for a crash.
+- **The weather card fits the city on one line** and says it updates itself about once an hour.
+- **A short note under "Add to home screen"** that a new widget can take a few seconds to
+  appear the first time, while its animation and cry download.
+
+**Desktop and browser: widgets live where you'd expect them to**
+
+<!-- screenshot slot: the browser home screen with a widget or two on it -->
+
+- **In the browser, the tab is the home screen.** Widgets sit right on the page, wherever you
+  drag them, with nothing drawn behind them unless you choose a background. Click one and it does
+  its tap action; drag it to move it; pull the corner to resize it. Editing opens a panel beside it
+  instead of a new tab.
+- **On the PC, widgets sit on the desktop**, on your wallpaper and behind your open apps, like a
+  widget on a phone's home screen. No window frame, no taskbar button, no background unless you
+  pick one. Drag one by the Pokémon itself, pull its corner to resize it, and hover it for edit
+  and remove.
+- **On the desktop, or on top of everything — your choice, per widget.** Pin a widget from
+  its hover controls (or in settings) and it floats above every window while you work; unpin
+  it and it goes back down onto the wallpaper.
+- **Still sprites move, as on your phone.** Emerald, FireRed/LeafGreen, Gen 4 and everything
+  from Gen 6 on now get the same idle movement as the Android widget — Bob, Breathe, Sway,
+  Hover, Swell, or Auto, which picks a breath for pixel art and a swell for 3D renders. Choose
+  it under Idle movement; if your computer is set to reduce motion, they stay still.
+- **Sprites load on restrictive networks.** Trainer sprites and the Emerald, Diamond/Pearl,
+  Platinum and HeartGold/SoulSilver sets failed on networks whose firewall blocks their hosts;
+  they now come through another route when that happens.
+- **They stay put.** Widgets come back after a restart, at the size and place you left them.
+- **A tray icon** keeps PokeWidget running with the settings window closed. Quit it from there.
+
 Like before: none of this changes a widget you've already placed. Tapping still plays the cry
 until you choose otherwise, and nothing asks for your location unless you tap the button.
 

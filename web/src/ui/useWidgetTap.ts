@@ -6,7 +6,7 @@ import { announceChange, updateWidget, type WidgetConfig } from '../core/store';
 import { aheadIds, aheadLooks, applyTap, pickSurprise, surpriseStillFits } from '../core/tap';
 import { isStale, onWeatherChanged, refresh, worldState } from '../core/weather';
 import { playCry, preloadCry } from '../core/audio';
-import { openSetupWindow } from '../desktop';
+import { showSettings } from '../desktop';
 
 /** How long an excited hop lasts; the same as the Android burst. */
 const EXCITED_MS = 2200;
@@ -139,8 +139,9 @@ export function useWidgetTap(
   config: WidgetConfig,
   shown: WidgetConfig,
   catalogs: Catalogs,
-  // The setup window's own preview has nothing to open.
-  inSetup = false,
+  // What "Open PokéWidget" opens: the settings window from a desktop widget, the widget's
+  // editor on the browser tab, nothing from the editor's own preview.
+  onOpenApp: () => void = () => void showSettings(),
 ): { onClick: () => void; excited: boolean } {
   const [excited, setExcited] = useState(false);
   const timer = useRef<number | undefined>(undefined);
@@ -153,7 +154,7 @@ export function useWidgetTap(
       updateWidget(widgetId, result.change);
       announceChange();
     }
-    if (result.effect === 'open-app' && !inSetup) void openSetupWindow();
+    if (result.effect === 'open-app') onOpenApp();
     if (result.effect === 'excite') {
       setExcited(true);
       window.clearTimeout(timer.current);
