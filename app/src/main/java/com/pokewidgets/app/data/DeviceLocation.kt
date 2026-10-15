@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.CancellationSignal
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -37,11 +38,18 @@ class DeviceLocation(context: Context) {
         appContext.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
 
-    /** Where the phone is, or null with no permission, no provider, or no fix in time. */
-    suspend fun currentPlace(): Place? {
-        if (!hasPermission() || manager == null) return null
-        val location = withTimeoutOrNull(FIX_TIMEOUT_MS) { freshFix() } ?: lastKnown() ?: return null
-        return Place(label(location), location.latitude, location.longitude)
+    /**
+     * Where the phone is, or null with no permission, no provider, or no fix in time.
+     *
+     * Entirely off the main thread. Every [LocationManager] call is a binder call into the
+     * system's location service, and right after the permission is granted some phones keep
+     * those waiting for seconds while the service wakes up — on the main thread, that was
+     * an "app not responding" on the tap that found the city anyway.
+     */
+    suspend fun currentPlace(): Place? = withContext(Dispatchers.IO) {
+        if (!hasPermission() || manager == null) return@withContext null
+        val location = withTimeoutOrNull(FIX_TIMEOUT_MS) { freshFix() } ?: lastKnown() ?: return@withContext null
+        Place(label(location), location.latitude, location.longitude)
     }
 
     @SuppressLint("MissingPermission") // Checked in currentPlace.
@@ -53,7 +61,7 @@ class DeviceLocation(context: Context) {
             val signal = CancellationSignal()
             continuation.invokeOnCancellation { signal.cancel() }
             runCatching {
-                manager!!.getCurrentLocation(provider, signal, appContext.mainExecutor) { location ->
+                manager!!.getCurrentLocation(provider, signal, Dispatchers.IO.asExecutor()) { location ->
                     if (continuation.isActive) continuation.resume(location)
                 }
             }.onFailure {

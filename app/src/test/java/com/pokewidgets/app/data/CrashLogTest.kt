@@ -1,6 +1,8 @@
 package com.pokewidgets.app.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -66,5 +68,36 @@ class CrashLogTest {
         val head = "java.lang.IllegalStateException: the sky fell in\n"
         val trimmed = CrashLog.trim(head + "\tat somewhere\n".repeat(CrashLog.MAX_CHARS))
         assertTrue(trimmed.startsWith(head))
+    }
+
+    @Test
+    fun `a freeze keeps only the main thread, which is the one that stopped`() {
+        val trace = """
+            ----- pid 123 at 2026-10-15 00:30:00 -----
+            Cmd line: com.pokewidgets.app.debug
+
+            "Signal Catcher" daemon prio=10 tid=2 Runnable
+              at nothing.interesting
+
+            "main" prio=5 tid=1 Blocked
+              at android.location.LocationManager.isProviderEnabled(LocationManager.java:1)
+              at com.pokewidgets.app.data.DeviceLocation.freshFix(DeviceLocation.kt:52)
+
+            "DefaultDispatcher-worker-1" daemon prio=5 tid=20 Waiting
+              at kotlinx.coroutines.idle
+        """.trimIndent()
+        val report = CrashLog.anrReport(trace, "Input dispatching timed out", "1.6-debug", "device", 34, 0L)
+        assertTrue(report.contains("thread: main (not responding)"))
+        assertTrue(report.contains("Input dispatching timed out"))
+        assertTrue(report.contains("DeviceLocation.freshFix"))
+        assertFalse("other threads are left out", report.contains("Signal Catcher"))
+        assertFalse("other threads are left out", report.contains("DefaultDispatcher"))
+    }
+
+    @Test
+    fun `a freeze with no trace still says so`() {
+        val report = CrashLog.anrReport(null, null, "1.6-debug", "device", 34, 0L)
+        assertTrue(report.contains("no stack trace"))
+        assertNull(CrashLog.mainThreadOf("no threads in here"))
     }
 }

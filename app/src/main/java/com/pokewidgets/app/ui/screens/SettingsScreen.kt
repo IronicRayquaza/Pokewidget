@@ -11,7 +11,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
@@ -142,41 +145,46 @@ fun SettingsScreen(
                 Spacer(Modifier.height(12.dp))
 
                 if (weatherPlace != null) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
+                    // The whole width and one line: beside a button, a city with its region
+                    // and country broke into a word per line.
+                    Text(
+                        weatherPlace.label,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    // The reading, not just the city. Live forms are otherwise
+                    // invisible until a widget happens to redraw, which makes
+                    // "it isn't working" and "it hasn't checked yet" look identical.
+                    Caption(
+                        when {
+                            checkingWeather -> "Checking…"
+                            weatherReading != null -> describe(weatherReading, weatherPlace)
+                            else -> "Not checked yet"
+                        },
+                    )
+                    // Otherwise "Check now" reads as something that has to be pressed.
+                    Caption("Updates itself about once an hour while a widget uses Live form.")
+                    Spacer(Modifier.height(12.dp))
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                weatherPlace.label,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Ink,
-                            )
-                            // The reading, not just the city. Live forms are otherwise
-                            // invisible until a widget happens to redraw, which makes
-                            // "it isn't working" and "it hasn't checked yet" look identical.
-                            Caption(
-                                when {
-                                    checkingWeather -> "Checking…"
-                                    weatherReading != null -> describe(weatherReading, weatherPlace)
-                                    else -> "Not checked yet"
-                                },
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
                         PokeButton(
                             text = "Check now",
                             onClick = onCheckWeather,
                             container = CardColor,
                             enabled = !checkingWeather,
                         )
+                        PokeButton(
+                            text = "Change city",
+                            onClick = { onChoosePlace(null) },
+                            container = CardColor,
+                        )
                     }
-                    Spacer(Modifier.height(10.dp))
-                    PokeButton(
-                        text = "Change city",
-                        onClick = { onChoosePlace(null) },
-                        container = CardColor,
-                    )
                 } else {
                     UseLocationButton(locating, onUseLocation, onLocationDenied)
                     Spacer(Modifier.height(12.dp))

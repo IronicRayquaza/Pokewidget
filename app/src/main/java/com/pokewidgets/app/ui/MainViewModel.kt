@@ -8,6 +8,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pokewidgets.app.BuildConfig
 import com.pokewidgets.app.catalog.CatalogRepository
 import com.pokewidgets.app.catalog.PokemonEntry
 import com.pokewidgets.app.catalog.SpriteKey
@@ -337,8 +338,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (!saved) return@launchSafely
 
             if (place != null) refreshWeather()
-            runCatching { WeatherRefreshScheduler.sync(getApplication()) }
-                .onFailure { Log.w(TAG, "could not sync the weather alarm", it) }
+            withContext(Dispatchers.IO) {
+                runCatching { WeatherRefreshScheduler.sync(getApplication()) }
+                    .onFailure { Log.w(TAG, "could not sync the weather alarm", it) }
+            }
             renderLiveFormWidgets()
         }
     }
@@ -393,8 +396,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * widgets that have since been removed from the home screen, and guarded per widget
      * exactly as `PokemonWidgetProvider.refreshLiveForms` already does — one widget that
      * cannot draw is not a reason to abandon the rest, still less to close the app.
+     *
+     * Off the main thread as a whole, not just per render: setting up the renderer and asking
+     * the launcher for its widget ids are synchronous system calls too.
      */
-    private suspend fun renderLiveFormWidgets() {
+    private suspend fun renderLiveFormWidgets() = withContext(Dispatchers.Default) {
         val renderer = WidgetRenderer(getApplication())
         val live = runCatching { WidgetRenderer.allWidgetIds(getApplication()).toSet() }
             .getOrDefault(emptySet())
@@ -409,8 +415,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Crash diagnostics -------------------------------------------------------
 
+    /** Picks up a freeze from the last run first, so it is in Settings on this launch. */
     fun refreshCrashReport() {
-        _state.update { it.copy(crashReport = CrashLog.read(getApplication())) }
+        launchSafely("read the crash report") {
+            val report = withContext(Dispatchers.IO) {
+                CrashLog.recordLastAnr(getApplication(), BuildConfig.VERSION_NAME)
+                CrashLog.read(getApplication())
+            }
+            _state.update { it.copy(crashReport = report) }
+        }
     }
 
     fun clearCrashReport() {
