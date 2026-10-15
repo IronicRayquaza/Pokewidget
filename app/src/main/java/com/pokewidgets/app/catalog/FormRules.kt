@@ -145,6 +145,12 @@ object FormRules {
     fun formFor(pokemonId: Int, world: WorldState): Int =
         byMember[pokemonId]?.pick?.invoke(world) ?: pokemonId
 
+    /**
+     * Every form [pokemonId] can be turned into, itself included — just itself when it has no
+     * rule. What a live-form widget downloads ahead, so a change of sky has nothing to wait for.
+     */
+    fun familyOf(pokemonId: Int): Set<Int> = byMember[pokemonId]?.members ?: setOf(pokemonId)
+
     /** Short phrase for the config screen, e.g. "Castform follows the weather". */
     fun describe(pokemonId: Int): String? = byMember[pokemonId]?.label
 

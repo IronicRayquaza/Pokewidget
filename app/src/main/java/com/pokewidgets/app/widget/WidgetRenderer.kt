@@ -38,6 +38,7 @@ import com.pokewidgets.app.sprite.IdleFrame
 import com.pokewidgets.app.sprite.IdleStyle
 import com.pokewidgets.app.sprite.TrainerArt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
@@ -72,6 +73,13 @@ class WidgetRenderer(private val context: Context) {
         val config = resolveConfig(widgetId)
         val options = runCatching { manager.getAppWidgetOptions(widgetId) }.getOrNull()
 
+        // Downloads start alongside the drawing rather than after it. They used to wait for
+        // the new sprite to reach the screen, so a form that had just changed was showing
+        // before its cry existed, and a tap in that gap heard the download.
+        launch { warmCry(config) }
+        launch { warmSurprise(config) }
+        Prefetch.start(context, config)
+
         val views = try {
             buildViews(widgetId, config, options)
         } catch (e: Exception) {
@@ -79,8 +87,6 @@ class WidgetRenderer(private val context: Context) {
             statusViews(widgetId, config, "Couldn't load sprite")
         }
         updateSafely(manager, widgetId, views, config)
-        warmCry(config)
-        warmSurprise(config)
     }
 
     /**
