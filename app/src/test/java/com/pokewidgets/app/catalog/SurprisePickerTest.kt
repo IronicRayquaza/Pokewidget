@@ -65,4 +65,15 @@ class SurprisePickerTest {
         assertEquals(emptySet<Int>(), SurprisePicker.decode(null))
         assertEquals(setOf(4), SurprisePicker.decode("4,x,-2,"))
     }
+
+    @Test
+    fun `picks stop at ten, and taking one out always works`() {
+        val ten = (1..SurprisePicker.MAX_PICKS).toSet()
+        assertEquals(setOf(25), SurprisePicker.toggle(emptySet(), 25))
+        assertEquals(emptySet<Int>(), SurprisePicker.toggle(setOf(25), 25))
+        assertEquals("an eleventh is ignored", ten, SurprisePicker.toggle(ten, 99))
+        assertEquals(ten - 3, SurprisePicker.toggle(ten, 3))
+        val savedBeforeTheCap = (1..12).toSet()
+        assertEquals(savedBeforeTheCap - 5, SurprisePicker.toggle(savedBeforeTheCap, 5))
+    }
 }

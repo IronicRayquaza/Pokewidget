@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.pokewidgets.app.catalog.PokemonEntry
+import com.pokewidgets.app.ui.components.Caption
 import com.pokewidgets.app.ui.components.EmptyHint
 import com.pokewidgets.app.ui.components.PokeButton
 import com.pokewidgets.app.ui.components.PokeChip
@@ -40,7 +41,7 @@ import com.pokewidgets.app.ui.theme.dottedPaper
  *
  * With [chosen] set it picks several instead of one: each tap toggles a Pokémon in or out
  * through [onSelect], and the page stays open until Done. That is how "Surprise me" gets its
- * list of Pokémon to draw from.
+ * list of Pokémon to draw from. [limit] is only shown here; [onSelect] is what enforces it.
  */
 @Composable
 fun PokemonPicker(
@@ -49,6 +50,7 @@ fun PokemonPicker(
     onSelect: (Int) -> Unit,
     onBack: () -> Unit,
     chosen: Set<Int>? = null,
+    limit: Int? = null,
 ) {
     BackHandler(onBack = onBack)
 
@@ -69,10 +71,20 @@ fun PokemonPicker(
             PokeHeader("Choose a Pokémon", onBack = onBack)
         } else {
             PokeHeader(
-                if (chosen.isEmpty()) "Pick Pokémon" else "${chosen.size} picked",
+                when {
+                    limit == null -> if (chosen.isEmpty()) "Pick Pokémon" else "${chosen.size} picked"
+                    chosen.isEmpty() -> "Pick up to $limit"
+                    else -> "${chosen.size} of $limit picked"
+                },
                 onBack = onBack,
                 trailing = { PokeButton(text = "Done", onClick = onBack) },
             )
+            if (limit != null && chosen.size >= limit) {
+                Caption(
+                    "That's $limit, the most a widget can hold. Tap one to take it out before adding another.",
+                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                )
+            }
         }
 
         PokeSearchField(

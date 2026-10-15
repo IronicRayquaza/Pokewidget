@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.pokewidgets.app.catalog.SurprisePicker
 import com.pokewidgets.app.ui.screens.ConfigActions
 import com.pokewidgets.app.ui.screens.ConfigScreen
 import com.pokewidgets.app.ui.screens.PokemonPicker
@@ -103,6 +104,7 @@ fun ConfigFlow(widgetId: Int, onDone: () -> Unit) {
             onSelect = viewModel::toggleSurprisePick,
             onBack = { step = ConfigStep.SETTINGS },
             chosen = state.config.surprisePool,
+            limit = SurprisePicker.MAX_PICKS,
         )
 
         ConfigStep.SPRITE_SET -> SpriteSetPickerScreen(

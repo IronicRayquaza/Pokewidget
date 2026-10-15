@@ -12,6 +12,7 @@ import com.pokewidgets.app.catalog.PokemonEntry
 import com.pokewidgets.app.catalog.SpriteKey
 import com.pokewidgets.app.catalog.ShinyAvailability
 import com.pokewidgets.app.catalog.SpriteSet
+import com.pokewidgets.app.catalog.SurprisePicker
 import com.pokewidgets.app.catalog.Trainer
 import com.pokewidgets.app.catalog.TrainerIndex
 import com.pokewidgets.app.data.Scene
@@ -163,11 +164,12 @@ class ConfigViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Adds a Pokémon to the ones "Surprise me" draws from, or takes it out. The pre-chosen
-     * next surprise is dropped either way, so the next render picks from the new list.
+     * next surprise is dropped either way, so the next render picks from the new list. Past
+     * [SurprisePicker.MAX_PICKS] an add does nothing.
      */
     fun toggleSurprisePick(pokemonId: Int) = update {
-        val pool = if (pokemonId in it.surprisePool) it.surprisePool - pokemonId else it.surprisePool + pokemonId
-        it.copy(surprisePool = pool, surpriseNext = 0)
+        val pool = SurprisePicker.toggle(it.surprisePool, pokemonId)
+        if (pool == it.surprisePool) it else it.copy(surprisePool = pool, surpriseNext = 0)
     }
 
     fun clearSurprisePicks() = update { it.copy(surprisePool = emptySet(), surpriseNext = 0) }

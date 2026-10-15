@@ -19,6 +19,19 @@ object SurprisePicker {
     /** The last species number; everything above is an alternate form. */
     const val LAST_SPECIES = 1025
 
+    /** How many Pokémon "Only my picks" holds. The same number as `MAX_SURPRISE_PICKS` on desktop. */
+    const val MAX_PICKS = 10
+
+    /**
+     * [pool] with [pokemonId] taken out if it was in, or added if there is room. Taking out
+     * always works, so a pool saved before the cap existed can still be trimmed.
+     */
+    fun toggle(pool: Set<Int>, pokemonId: Int): Set<Int> = when {
+        pokemonId in pool -> pool - pokemonId
+        pool.size >= MAX_PICKS -> pool
+        else -> pool + pokemonId
+    }
+
     /** Everything [pool] allows that the sprite set [covered]. */
     fun candidates(pool: Set<Int>, covered: (Int) -> Boolean): List<Int> =
         (if (pool.isEmpty()) (1..LAST_SPECIES).toList() else pool.sorted()).filter(covered)
