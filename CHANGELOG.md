@@ -2,7 +2,9 @@
 
 What changed, written for someone using the app rather than reading the diff.
 
-## 1.6 (in testing, not released)
+## 1.6
+
+Installs over 1.5 and keeps your widgets. And PokéWidget is now on Windows too.
 
 **New**
 
