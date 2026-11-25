@@ -128,8 +128,9 @@
   .btn.coral { background: var(--coral); }
   /* One button per platform, stacked, with room for each one's lift. */
   .downloads { display: grid; gap: calc(12px + var(--lift)); }
-  /* Mac: shaped like the others so the row reads as one set, but flat and quiet, and not a
-     link, so nobody mistakes it for something to click. */
+  /* A platform with no download yet: shaped like the others so the row reads as one set, but
+     flat and quiet, so nobody mistakes it for something to click. The script removes the
+     class once the latest release has a file for it. */
   .btn.soon {
     background: var(--chalk);
     color: var(--ink-soft);
@@ -175,7 +176,7 @@
   <header>
     <h1 class="pixel">Poké<span class="accent">Widget</span></h1>
     <p class="tagline">Animated Pokémon sprites, living on your home screen.</p>
-    <p class="sub">Any Pokémon, in any game's art. Tap one to hear its cry. For Android and Windows, and free.</p>
+    <p class="sub">Any Pokémon, in any game's art. Tap one to hear its cry. For Android, Windows and Mac, and free.</p>
   </header>
 
   <!-- The thing a still frame cannot show. Muted so it is allowed to autoplay at all, with
@@ -194,8 +195,8 @@
 
   <div class="card">
     <h2 class="pixel">Download</h2>
-    <!-- Both buttons start on the releases page and are pointed at the file itself once the
-         latest release has been read; see the script at the end. -->
+    <!-- The Android and Windows buttons start on the releases page and are pointed at the file
+         itself once the latest release has been read; see the script at the end. -->
     <div class="downloads">
       <a class="btn" id="download-android" href="https://github.com/IronicRayquaza/Pokewidget/releases/latest">
         <span id="android-label">Download for Android</span>
@@ -205,12 +206,13 @@
         <span id="windows-label">Download for Windows</span>
         <span class="meta" id="windows-meta">Windows 10 and 11, 64-bit</span>
       </a>
-      <!-- Not a link: there is nothing to download yet, and a button that goes nowhere is worse
-           than one that says so. -->
-      <div class="btn soon" aria-disabled="true">
-        <span>Mac</span>
-        <span class="meta">Coming soon</span>
-      </div>
+      <!-- No href until the script finds a .dmg on the latest release, so until then this is a
+           placeholder rather than a link: a button that goes nowhere is worse than one that
+           says "Coming soon". Then the page can go live before or after the .dmg does. -->
+      <a class="btn soon" id="download-mac" aria-disabled="true">
+        <span id="mac-label">Mac</span>
+        <span class="meta" id="mac-meta">Coming soon</span>
+      </a>
     </div>
     <!-- IMAGE SLOT: a PokéWidget sitting on a Windows desktop. -->
     <p class="sub" style="margin-top: 16px">
@@ -245,6 +247,22 @@
         open apps; drag it anywhere, pull its corner to resize it, or pin it to keep it on top
         of everything.</li>
     </ol>
+    <h3>On Mac</h3>
+    <ol>
+      <li><b>Open the downloaded <code>.dmg</code> and drag PokéWidget into Applications.</b>
+        One download works on Apple Silicon and Intel Macs alike.</li>
+      <li><b>Open it once. macOS will refuse</b>, because the app is not signed by Apple. It is
+        not broken; macOS says this about any app downloaded from outside the App Store
+        that isn’t signed by Apple.
+        <ul style="margin-top: 10px">
+          <li>If it says Apple <b>could not verify</b> PokéWidget: open <b>System Settings →
+            Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</li>
+          <li>If it says the app <b>is damaged</b>: open Terminal, run
+            <code>xattr -cr /Applications/PokeWidget.app</code>, then open it normally.</li>
+        </ul>
+        You only do this once per version.</li>
+      <li><b>Make a widget and put it on the desktop</b>, the same way as on Windows.</li>
+    </ol>
   </div>
 
   <div class="card">
@@ -254,6 +272,7 @@
       <li><b>On Windows.</b> Widgets sit right on your desktop, under your apps — or pinned on
         top of everything. Drag one anywhere, pull its corner to resize it, and it’s still there
         after a restart.</li>
+      <li><b>On Mac.</b> The same desktop widgets, on Apple Silicon and Intel Macs.</li>
       <li><b>Surprise me.</b> Each tap swaps in a random Pokémon with its cry — from every
         Pokémon, or from up to ten of your own picks.</li>
       <li><b>Use my location</b> for live forms, instead of typing a city. Asked for only when
@@ -373,16 +392,22 @@
       const assets = release.assets || [];
       // Each button is pointed at its own file only if this release has one; otherwise it
       // keeps going to the releases page.
-      const fill = (asset, platform, requirement) => {
+      const fill = (asset, platform, name, requirement) => {
         if (!asset) return;
-        document.getElementById("download-" + platform).href = asset.browser_download_url;
+        const button = document.getElementById("download-" + platform);
+        button.href = asset.browser_download_url;
+        // The Mac button starts as a "Coming soon" placeholder; a .dmg makes it a real one.
+        button.classList.remove("soon");
+        button.removeAttribute("aria-disabled");
         document.getElementById(platform + "-label").textContent =
-          "Download " + release.tag_name + " for " + (platform === "android" ? "Android" : "Windows");
+          "Download " + release.tag_name + " for " + name;
         document.getElementById(platform + "-meta").textContent =
           asset.name + " · " + megabytes(asset.size) + " · " + requirement;
       };
-      fill(assets.find(asset => asset.name.endsWith(".apk")), "android", "Android 8.0 and up");
-      fill(assets.find(asset => asset.name.endsWith(".exe")), "windows", "Windows 10 and 11, 64-bit");
+      fill(assets.find(asset => asset.name.endsWith(".apk")), "android", "Android", "Android 8.0 and up");
+      fill(assets.find(asset => asset.name.endsWith(".exe")), "windows", "Windows", "Windows 10 and 11, 64-bit");
+      fill(assets.find(asset => asset.name.endsWith(".dmg")), "mac", "Mac",
+        "macOS 10.15 or newer, Apple Silicon and Intel");
     })
     .catch(() => {
       // No release yet, offline, or rate-limited. The button still goes to the releases page,

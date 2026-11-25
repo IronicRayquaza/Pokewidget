@@ -76,7 +76,7 @@ Status snapshot for PokéWidget. See `README.md` for architecture and how-it-wor
       triggering `PACKAGE_CHANGED` → `AppWidgetServiceImpl` re-broadcast (replaced with a
       plain coroutine off `goAsync()`).
 
-**1.6 (released 2026-10-16: Android and Windows; Mac as a test build for Discord)**
+**1.6 (released 2026-10-16: Android and Windows; Mac added to the same release 2026-11-25)**
 - [x] Surprise me tap action with an optional pool (`SurprisePicker`), next surprise pre-picked
       and pre-fetched at render time, its id carried in the tap intent. Verified on the
       Pixel 6 Pro API 30 emulator: a pool of Bulbasaur/Charmander/Squirtle only ever produced
@@ -98,7 +98,8 @@ Status snapshot for PokéWidget. See `README.md` for architecture and how-it-wor
       networks. Checked in the built Windows app.
 - [x] Downloads ahead: every pick (10 at most), every live form, the toggled shiny/back look.
 - [x] "Use my location" off the main thread; ANRs kept as crash reports (Android 11+).
-- [ ] A Mac tester opens the `.dmg` from the v1.6 workflow run (handed to Discord testers).
+- [x] Mac `.dmg` (universal) rebuilt from the `v1.6` tag and attached to the v1.6 release on
+      2026-11-25 — no new version, since nothing changed in the code.
 - [ ] "Use my location" on a real phone, and in the desktop app on Windows and macOS.
 
 ## Not delivered / known gaps
