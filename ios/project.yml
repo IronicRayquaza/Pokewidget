@@ -1,0 +1,104 @@
+# XcodeGen spec for the iOS prototype. The .xcodeproj is generated from this and not committed:
+#
+#   brew install xcodegen && xcodegen generate     (from ios/)
+#
+# A prototype on branch proto/ios only: never part of a release, and nothing here is built by
+# CI. Signing is left to Xcode: pick your Personal Team under Signing & Capabilities.
+name: PokeWidgetProto
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  PokeWidgetProto:
+    type: application
+    platform: iOS
+    sources: [App, Shared]
+    dependencies:
+      - target: PokeWidgetProtoWidget
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: PokéWidget Proto
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSPhotoLibraryAddUsageDescription: Saves the GIFs you export to your photos.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pokewidgets.proto
+    scheme:
+      testTargets: [PokeWidgetProtoTests]
+  PokeWidgetProtoWidget:
+    type: app-extension
+    platform: iOS
+    # Widget/Fonts is made by tools/make-frame-fonts.py and git-ignored; run it first.
+    sources: [Widget, Shared]
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: PokéWidget Proto
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        # Fixed names: the generator always writes 20 fonts (10 fps) per sprite.
+        UIAppFonts:
+          - PWBlink.ttf
+          - PWFrames-showdown25-0.ttf
+          - PWFrames-showdown25-1.ttf
+          - PWFrames-showdown25-2.ttf
+          - PWFrames-showdown25-3.ttf
+          - PWFrames-showdown25-4.ttf
+          - PWFrames-showdown25-5.ttf
+          - PWFrames-showdown25-6.ttf
+          - PWFrames-showdown25-7.ttf
+          - PWFrames-showdown25-8.ttf
+          - PWFrames-showdown25-9.ttf
+          - PWFrames-showdown25-10.ttf
+          - PWFrames-showdown25-11.ttf
+          - PWFrames-showdown25-12.ttf
+          - PWFrames-showdown25-13.ttf
+          - PWFrames-showdown25-14.ttf
+          - PWFrames-showdown25-15.ttf
+          - PWFrames-showdown25-16.ttf
+          - PWFrames-showdown25-17.ttf
+          - PWFrames-showdown25-18.ttf
+          - PWFrames-showdown25-19.ttf
+          - PWFrames-emerald25-0.ttf
+          - PWFrames-emerald25-1.ttf
+          - PWFrames-emerald25-2.ttf
+          - PWFrames-emerald25-3.ttf
+          - PWFrames-emerald25-4.ttf
+          - PWFrames-emerald25-5.ttf
+          - PWFrames-emerald25-6.ttf
+          - PWFrames-emerald25-7.ttf
+          - PWFrames-emerald25-8.ttf
+          - PWFrames-emerald25-9.ttf
+          - PWFrames-emerald25-10.ttf
+          - PWFrames-emerald25-11.ttf
+          - PWFrames-emerald25-12.ttf
+          - PWFrames-emerald25-13.ttf
+          - PWFrames-emerald25-14.ttf
+          - PWFrames-emerald25-15.ttf
+          - PWFrames-emerald25-16.ttf
+          - PWFrames-emerald25-17.ttf
+          - PWFrames-emerald25-18.ttf
+          - PWFrames-emerald25-19.ttf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pokewidgets.proto.widget
+        # Experiment 3 calls SwiftUI's private _clockHandRotationEffect. Remove this flag to
+        # build without it (the rotation widget then stands still).
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) PRIVATE_ROTATION
+  PokeWidgetProtoTests:
+    type: bundle.unit-test
+    platform: iOS
+    # Hostless: it only needs the idle table and the fixture dumped from idle.ts.
+    sources: [Tests, Shared/Idle.swift]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pokewidgets.proto.tests

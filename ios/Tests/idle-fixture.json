@@ -1,0 +1,570 @@
+{
+  "versions_generation_iii_emerald": {
+    "none": {
+      "resolved": "none",
+      "intervalMs": 1000,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        }
+      ]
+    },
+    "bob": {
+      "resolved": "bob",
+      "intervalMs": 260,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": -1
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": -1
+        }
+      ]
+    },
+    "breathe": {
+      "resolved": "breathe",
+      "intervalMs": 150,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1015,
+          "scaleYPermille": 985,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1030,
+          "scaleYPermille": 970,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1030,
+          "scaleYPermille": 970,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1015,
+          "scaleYPermille": 985,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        }
+      ]
+    },
+    "sway": {
+      "resolved": "sway",
+      "intervalMs": 170,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 1,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 2,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 2,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 1,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -1,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -2,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -2,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -1,
+          "dySource": 0
+        }
+      ]
+    },
+    "hover": {
+      "resolved": "hover",
+      "intervalMs": 130,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 1,
+          "dySource": -1
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 1,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": -3
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -1,
+          "dySource": -3
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -1,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": -1
+        }
+      ]
+    },
+    "settle": {
+      "resolved": "settle",
+      "intervalMs": 170,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1010,
+          "scaleYPermille": 1010,
+          "dxSource": 0,
+          "dySource": -1
+        },
+        {
+          "scaleXPermille": 1020,
+          "scaleYPermille": 1020,
+          "dxSource": 0,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1020,
+          "scaleYPermille": 1020,
+          "dxSource": 0,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1010,
+          "scaleYPermille": 1010,
+          "dxSource": 0,
+          "dySource": -1
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        }
+      ]
+    },
+    "auto": {
+      "resolved": "breathe",
+      "intervalMs": 150,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1015,
+          "scaleYPermille": 985,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1030,
+          "scaleYPermille": 970,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1030,
+          "scaleYPermille": 970,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1015,
+          "scaleYPermille": 985,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        }
+      ]
+    }
+  },
+  "versions_generation_ix_scarlet_violet": {
+    "none": {
+      "resolved": "none",
+      "intervalMs": 1000,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        }
+      ]
+    },
+    "bob": {
+      "resolved": "bob",
+      "intervalMs": 260,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": -1
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": -1
+        }
+      ]
+    },
+    "breathe": {
+      "resolved": "breathe",
+      "intervalMs": 150,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1015,
+          "scaleYPermille": 985,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1030,
+          "scaleYPermille": 970,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1030,
+          "scaleYPermille": 970,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1015,
+          "scaleYPermille": 985,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        }
+      ]
+    },
+    "sway": {
+      "resolved": "sway",
+      "intervalMs": 170,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 1,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 2,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 2,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 1,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -1,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -2,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -2,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -1,
+          "dySource": 0
+        }
+      ]
+    },
+    "hover": {
+      "resolved": "hover",
+      "intervalMs": 130,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 1,
+          "dySource": -1
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 1,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": -3
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -1,
+          "dySource": -3
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": -1,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": -1
+        }
+      ]
+    },
+    "settle": {
+      "resolved": "settle",
+      "intervalMs": 170,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1010,
+          "scaleYPermille": 1010,
+          "dxSource": 0,
+          "dySource": -1
+        },
+        {
+          "scaleXPermille": 1020,
+          "scaleYPermille": 1020,
+          "dxSource": 0,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1020,
+          "scaleYPermille": 1020,
+          "dxSource": 0,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1010,
+          "scaleYPermille": 1010,
+          "dxSource": 0,
+          "dySource": -1
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        }
+      ]
+    },
+    "auto": {
+      "resolved": "settle",
+      "intervalMs": 170,
+      "frames": [
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        },
+        {
+          "scaleXPermille": 1010,
+          "scaleYPermille": 1010,
+          "dxSource": 0,
+          "dySource": -1
+        },
+        {
+          "scaleXPermille": 1020,
+          "scaleYPermille": 1020,
+          "dxSource": 0,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1020,
+          "scaleYPermille": 1020,
+          "dxSource": 0,
+          "dySource": -2
+        },
+        {
+          "scaleXPermille": 1010,
+          "scaleYPermille": 1010,
+          "dxSource": 0,
+          "dySource": -1
+        },
+        {
+          "scaleXPermille": 1000,
+          "scaleYPermille": 1000,
+          "dxSource": 0,
+          "dySource": 0
+        }
+      ]
+    }
+  }
+}

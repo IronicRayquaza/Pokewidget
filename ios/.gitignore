@@ -1,0 +1,11 @@
+# Generated from project.yml by XcodeGen.
+*.xcodeproj/
+# Xcode's own files.
+xcuserdata/
+DerivedData/
+build/
+# Made from Nintendo's sprites by tools/make-frame-fonts.py: never committed, like the apps,
+# which fetch every sprite at runtime.
+Widget/Fonts/
+tools/.venv/
+tools/.cache/
