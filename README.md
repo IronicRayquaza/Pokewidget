@@ -26,10 +26,11 @@ normal:
 A sideloaded app cannot update itself, so new versions are announced in
 **[the Discord](https://discord.gg/QFuHPZJRqM)**, along with install help and somewhere to report what breaks.
 
-## On Windows
+## On Windows and Mac
 
-The same widgets run on a PC: **[download the Windows app](https://ironicrayquaza.github.io/Pokewidget/)**,
-whose widgets sit right on your desktop with no frame or background. A Mac version is coming.
+The same widgets run on a computer: **[download the Windows or Mac app](https://ironicrayquaza.github.io/Pokewidget/)**,
+whose widgets sit right on your desktop with no frame or background. The Mac download is one
+universal `.dmg` for Apple Silicon and Intel, macOS 10.15 or newer.
 
 The code is in [`web/`](web/README.md) — one TypeScript app, packaged with Tauri for the
 desktop. It reads the very same generated catalogs the Android app ships, and the rules that

@@ -6,6 +6,10 @@ What changed, written for someone using the app rather than reading the diff.
 
 Installs over 1.5 and keeps your widgets. And PokéWidget is now on Windows too.
 
+**Now on Mac too (added to 1.6 on 2026-11-25).** The same 1.6 desktop app, built from the same
+code as the Windows one, as a single `.dmg` for Apple Silicon and Intel Macs on macOS 10.15 or
+newer. Nothing changed on Android or Windows, so there is nothing new to install there.
+
 **New**
 
 - **Surprise me.** A new choice under "When tapped": each tap swaps the Pokémon on the widget
