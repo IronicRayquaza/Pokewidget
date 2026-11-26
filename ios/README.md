@@ -104,6 +104,25 @@ The simulator runtime isn't part of the Xcode download: Xcode → Settings → C
 If idle.ts changes, regenerate the fixture with
 `node --experimental-strip-types ios/tools/dump-idle.mjs > ios/Tests/idle-fixture.json`.
 
+## An .ipa for a tester without a Mac
+
+[TESTING.md](TESTING.md) is the guide to send: install with AltStore Classic, what to test,
+and a form to send back. To make the unsigned `.ipa` (AltStore signs it with the tester's own
+Apple ID), after the font and xcodegen steps above:
+
+```bash
+cd ios
+xcodebuild -project PokeWidgetProto.xcodeproj -scheme PokeWidgetProto -configuration Release \
+  -destination 'generic/platform=iOS' -archivePath build/PokeWidgetProto.xcarchive \
+  CODE_SIGNING_ALLOWED=NO archive
+rm -rf build/Payload && mkdir build/Payload
+cp -R build/PokeWidgetProto.xcarchive/Products/Applications/PokeWidgetProto.app build/Payload/
+(cd build && zip -qry PokeWidgetProto-0.1.ipa Payload)
+```
+
+`build/` is git-ignored. The `.ipa` carries frame fonts made from Nintendo's sprites, so send
+it to testers privately; never attach it to a release or post it publicly.
+
 ## What to look for on the phone
 
 The simulator can behave differently from a real phone, so the phone decides. For each widget:
