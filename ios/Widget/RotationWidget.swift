@@ -103,6 +103,16 @@ struct RotationProvider: AppIntentTimelineProvider {
 struct RotationView: View {
     var entry: RotationEntry
 
+    /// Says so when the build couldn't use the private API, so a still sprite isn't misread.
+    @ViewBuilder private var rotationNote: some View {
+        #if !PRIVATE_ROTATION
+        Text("Built without the rotation API")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .padding(4)
+        #endif
+    }
+
     var body: some View {
         GeometryReader { geometry in
             if let image = entry.image {
@@ -115,6 +125,7 @@ struct RotationView: View {
                     .glide(glide, unit: unit, period: period)
                     .offset(x: glide.centre.width * unit, y: glide.centre.height * unit)
                     .frame(width: geometry.size.width, height: geometry.size.height)
+                    .overlay(alignment: .bottom) { rotationNote }
             } else {
                 MessageView(text: "Couldn't load the sprite")
             }

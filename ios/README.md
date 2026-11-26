@@ -18,7 +18,7 @@ The catch is a re-sign every 7 days.
 |---|---|---|---|
 | 1 | **Baseline** | Doesn't: a still frame. Tapping swaps to the shiny via an App Intent. Apple's supported API only. | to try on a phone |
 | 2 | **Frames by timer fonts** | Real frames. Timer text keeps ticking inside a widget on its own; drawn in generated fonts whose "digits" are frames, 20 stacked timers flip at 10 fps. Bryce Bostwick's [WidgetAnimation](https://github.com/brycebostwick/WidgetAnimation) technique (MIT). | to try on a phone |
-| 3 | **Idle by rotation** | Bob, Sway or Hover for a still sprite. Three nested rotations from SwiftUI's private `_clockHandRotationEffect` cancel into a straight or oval glide. Breathe and Swell can't be done this way, since they change the scale. | to try on a phone |
+| 3 | **Idle by rotation** | Bob, Sway or Hover for a still sprite. Three nested rotations from SwiftUI's private `_clockHandRotationEffect` cancel into a straight or oval glide. Breathe and Swell can't be done this way, since they change the scale. | **blocked**: the iOS 27.2 SDK (Xcode 27.2) no longer declares the API to Swift, so it's built without it and stands still |
 
 Each widget has a **Background** option, *System* or *None*, to see whether a widget can sit
 straight on the wallpaper.
@@ -45,6 +45,19 @@ use; nothing is bundled.
   crisp and transparent.
 - The app and the widgets type-check as iOS code against the Mac Catalyst SDK. The exception is
   the private rotation call, which only exists in the iOS SDK.
+
+## Checked with Xcode 27.2 (iOS 27.2 SDK, iPhone 17 simulator)
+
+- The app and the widget build for a real iPhone (`generic/platform=iOS`, unsigned). The widget
+  carries all 41 fonts, lists them in `UIAppFonts`, and ships `frame-fonts.json`.
+- `IdleTests` passes in the simulator.
+- The app runs in the simulator: it downloads the Showdown Pikachu, plays it crisp over the
+  checkerboard, and exports a 480 px, 33-frame, 1.32 s GIF that loops forever with transparency.
+- `_clockHandRotationEffect` is still in WidgetKit's binary but is no longer in its
+  `.swiftinterface`, so Swift can't call it. Calling the raw symbol would be too fragile, so
+  `PRIVATE_ROTATION` is off and widget 3 says "Built without the rotation API".
+- Widgets can't be placed on the simulator's Home Screen from the command line, so the widgets
+  themselves are still for the phone.
 
 ## Building it
 
@@ -81,10 +94,13 @@ In Xcode:
 Add the widgets: long-press the Home Screen → **Edit** → **Add Widget** → PokéWidget Proto.
 Long-press a placed widget → **Edit Widget** to change its sprite, movement or background.
 
-If the build fails on `_clockHandRotationEffect`, the private API's signature differs in your
-SDK. Remove `PRIVATE_ROTATION` from `project.yml`, regenerate, and widget 3 will stand still.
+`PRIVATE_ROTATION` is off in `project.yml` because the iOS 27.2 SDK hides
+`_clockHandRotationEffect`. With an older Xcode whose SDK still declares it, turn it back on
+there and regenerate.
 
 Tests: `xcodebuild test -scheme PokeWidgetProto -destination 'platform=iOS Simulator,name=iPhone 17'`.
+The simulator runtime isn't part of the Xcode download: Xcode → Settings → Components, or
+`xcodebuild -downloadPlatform iOS`.
 If idle.ts changes, regenerate the fixture with
 `node --experimental-strip-types ios/tools/dump-idle.mjs > ios/Tests/idle-fixture.json`.
 

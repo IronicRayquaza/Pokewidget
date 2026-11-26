@@ -28,6 +28,7 @@ targets:
         CFBundleDisplayName: PokéWidget Proto
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiresFullScreen: true
         NSPhotoLibraryAddUsageDescription: Saves the GIFs you export to your photos.
     settings:
       base:
@@ -91,9 +92,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pokewidgets.proto.widget
-        # Experiment 3 calls SwiftUI's private _clockHandRotationEffect. Remove this flag to
-        # build without it (the rotation widget then stands still).
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) PRIVATE_ROTATION
+        # Experiment 3 needs WidgetKit's private _clockHandRotationEffect. The iOS 27.2 SDK
+        # (Xcode 27.2) no longer declares it to Swift, though the symbol is still in the
+        # binary, so it's off. On an SDK that still declares it, add PRIVATE_ROTATION:
+        # SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) PRIVATE_ROTATION
   PokeWidgetProtoTests:
     type: bundle.unit-test
     platform: iOS
@@ -102,3 +104,4 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pokewidgets.proto.tests
+        GENERATE_INFOPLIST_FILE: YES
